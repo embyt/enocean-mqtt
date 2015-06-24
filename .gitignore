@@ -1,0 +1,12 @@
+bin
+include
+lib
+local
+share
+*.pyc
+
+*.egg-info
+build
+man
+MANIFEST
+dist
