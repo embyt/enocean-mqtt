@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 import logging
 import sys
+import os
+import signal
 import traceback
 from configparser import ConfigParser
-import queue
 
-from enocean.communicators.serialcommunicator import SerialCommunicator
-from enocean.protocol.packet import Packet
-from enocean.protocol.constants import PACKET, RORG
-import paho.mqtt.client as mqtt
+from enoceanmqtt.communicator import Communicator
 
 
 def load_config_file():
@@ -28,51 +26,55 @@ def load_config_file():
     # general configuration is part of DEFAULT section
     return sensors, conf['DEFAULT']
 
-def on_mqtt_connect(client, userdata, flags, rc):
-    '''callback for when the client receives a CONNACK response from the MQTT server.'''
-    logging.info("Connected to MQTT broker with result code "+str(rc))
+
+def cb_signal_handler(received_signal, frame):
+    """handles keyboard interrupts and exits execution."""
+    logging.warning("Exiting with signal {}.\n".format(received_signal))
+    exit()
 
 
-# init logging
-logging.basicConfig(level=logging.DEBUG)
+def setup_logging():
+    # set root logger to highest log level
+    logging.getLogger().setLevel(logging.DEBUG)
 
-# load config file
-sensors, conf = load_config_file()
+    # create file and console handler
+    log_filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'enoceanmqtt.log')
+    log_file = logging.FileHandler(log_filename)
+    log_file.setLevel(logging.INFO)
+    log_console = logging.StreamHandler()
+    log_console.setLevel(logging.DEBUG)
 
-# setup mqtt connection
-mqtt = mqtt.Client()
-mqtt.on_connect = on_mqtt_connect
-mqtt.connect(conf['mqtt_host'], int(conf['mqtt_port'],0))
-mqtt.loop_start()
+    # create formatter and add it to the handlers
+    formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+    log_file.setFormatter(formatter)
+    log_console.setFormatter(formatter)
 
-# setup enocean communication
-enocean = SerialCommunicator(conf['enocean_port'])
-enocean.start()
+    # add the handlers to the logger
+    logging.getLogger().addHandler(log_file)
+    logging.getLogger().addHandler(log_console)
 
-while enocean.is_alive():
+
+def main():
+    """entry point if called as an executable"""
+    # setup logger
+    #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+    setup_logging()
+    
+    # catch terminations for logging purposes
+    signal.signal(signal.SIGTERM, cb_signal_handler)
+
+    # load config file
+    sensors, conf = load_config_file()
+
+    # start working
+    com = Communicator(conf, sensors)
     try:
-        # Loop to empty the queue...
-        packet = enocean.receive.get(block=True, timeout=1)
-        # search for fitting sensor
-        found_sensor = False
-        for cur_sensor in sensors:
-            if packet.type == PACKET.RADIO and packet.rorg == cur_sensor['rorg'] and \
-                    packet.sender == cur_sensor['address']:
-                for cur_prop in packet.parse_eep(cur_sensor['func'], cur_sensor['type']):
-                    logging.debug("{}={}".format(cur_sensor['name'], packet.parsed[cur_prop]['value']))
-                    mqtt.publish(cur_sensor['name'], packet.parsed[cur_prop]['value'])
-                found_sensor = True
-                break
-        if not found_sensor:
-            print('sensor not found: %s' % packet)
+        com.run()
+    # catch all possible exceptions
+    except Exception:     # pylint: disable=broad-except
+        logging.error(traceback.format_exc())
 
-    except queue.Empty:
-        continue
-    except KeyboardInterrupt:
-        break
-    except Exception:
-        traceback.print_exc(file=sys.stdout)
-        break
 
-if enocean.is_alive():
-    enocean.stop()
+# check for execution
+if __name__ == "__main__":
+    main()
