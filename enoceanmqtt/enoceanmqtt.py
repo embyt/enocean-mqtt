@@ -12,10 +12,12 @@ from enoceanmqtt.communicator import Communicator
 def load_config_file():
     conf = ConfigParser(inline_comment_prefixes=('#', ';'))
     if len(sys.argv) > 1:
-        conf.read(sys.argv[1])
+        conf_file = sys.argv[1]
     else:
-        # try default config file name
-        conf.read("enoceanmqtt.conf")
+        conf_file = "enoceanmqtt.conf"
+    if not conf.read(conf_file):
+        logging.error("Cannot read config file: {}".format(conf_file))
+
     # extract sensor configuration
     sensors = []
     for section in conf.sections():

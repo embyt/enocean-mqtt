@@ -56,5 +56,3 @@ class Communicator:
 
             except queue.Empty:
                 continue
-            except KeyboardInterrupt:
-                break
