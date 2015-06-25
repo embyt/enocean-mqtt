@@ -1,11 +1,11 @@
 [Unit]
 Description=EnOcean MQTT Forwarder
-After=mosquitto.service
+After=mosquitto
 
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/enoceanmqtt
-Restart=restart-always
+Restart=always
 WorkingDirectory=/home/pi/eno
 User=pi
 

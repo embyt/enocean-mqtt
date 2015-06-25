@@ -2,7 +2,6 @@
 import logging
 import sys
 import os
-import signal
 import traceback
 from configparser import ConfigParser
 
@@ -27,12 +26,6 @@ def load_config_file():
         sensors.append(new_sens)
     # general configuration is part of DEFAULT section
     return sensors, conf['DEFAULT']
-
-
-def cb_signal_handler(received_signal, frame):
-    """handles keyboard interrupts and exits execution."""
-    logging.warning("Exiting with signal {}.\n".format(received_signal))
-    exit()
 
 
 def setup_logging():
@@ -62,9 +55,6 @@ def main():
     #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
     setup_logging()
     
-    # catch terminations for logging purposes
-    signal.signal(signal.SIGTERM, cb_signal_handler)
-
     # load config file
     sensors, conf = load_config_file()
 
