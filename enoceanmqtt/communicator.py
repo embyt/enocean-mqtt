@@ -48,7 +48,9 @@ class Communicator:
                         for prop_name in properties:
                             cur_prop = packet.parsed[prop_name]
                             logging.debug("{}={}".format(cur_sensor['name'], cur_prop['value']))
-                            self.mqtt.publish(cur_sensor['name'], cur_prop['value'])
+                            self.mqtt.publish(cur_sensor['name']+"/raw", cur_prop['raw_value'])
+                            self.mqtt.publish(cur_sensor['name']+"/value", cur_prop['value'])
+                            self.mqtt.publish(cur_sensor['name']+"/dbm", packet.dBm)
                         found_sensor = True
                         break
                 if not found_sensor:
