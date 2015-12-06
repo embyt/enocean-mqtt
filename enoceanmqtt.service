@@ -6,7 +6,7 @@ After=mosquitto
 Type=simple
 ExecStart=/usr/local/bin/enoceanmqtt
 Restart=always
-WorkingDirectory=/home/pi/eno
+WorkingDirectory=/home/pi/enoceanmqtt
 User=pi
 
 [Install]

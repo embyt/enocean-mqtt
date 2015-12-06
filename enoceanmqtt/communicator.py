@@ -18,6 +18,8 @@ class Communicator:
         # setup mqtt connection
         self.mqtt = mqtt.Client()
         self.mqtt.on_connect = self._on_connect
+        if 'mqtt_user' in self.conf:
+            self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
         self.mqtt.connect(self.conf['mqtt_host'], int(self.conf['mqtt_port'],0))
         self.mqtt.loop_start()
 
