@@ -21,8 +21,11 @@ def load_config_file():
     sensors = []
     for section in conf.sections():
         new_sens = {'name': conf['DEFAULT']['mqtt_prefix'] + section}
-        for key in ('address', 'rorg', 'func', 'type'):
-            new_sens[key] = int(conf[section][key], 0)
+        for key in ('address', 'rorg', 'func', 'type', 'ignore'):
+            try:
+                new_sens[key] = int(conf[section][key], 0)
+            except KeyError:
+                new_sens[key] = None
         sensors.append(new_sens)
     # general configuration is part of DEFAULT section
     return sensors, conf['DEFAULT']
