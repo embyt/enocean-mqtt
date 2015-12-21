@@ -1,5 +1,6 @@
 import logging
 import queue
+import numbers
 
 from enocean.communicators.serialcommunicator import SerialCommunicator
 from enocean.protocol.packet import Packet
@@ -72,10 +73,12 @@ class Communicator:
                             for prop_name in properties:
                                 found_property = True
                                 cur_prop = packet.parsed[prop_name]
-                                logging.info("{}: {}={} {}".format(cur_sensor['name'], cur_prop['description'], cur_prop['value'], cur_prop['unit']))
-                                self.mqtt.publish(cur_sensor['name']+"/raw", cur_prop['raw_value'])
-                                self.mqtt.publish(cur_sensor['name']+"/value", cur_prop['value'])
-                                self.mqtt.publish(cur_sensor['name']+"/dbm", packet.dBm)
+                                if isinstance(cur_prop['value'], numbers.Number):
+                                    value = cur_prop['value']
+                                else:
+                                    value = cur_prop['raw_value']
+                                logging.info("{}: {} ({})={} {}".format(cur_sensor['name'], prop_name, cur_prop['description'], cur_prop['value'], cur_prop['unit']))
+                                self.mqtt.publish(cur_sensor['name']+"/"+prop_name, value)
                             break
                 if not found_property:
                     logging.warn('message not interpretable: {}'.format(found_sensor['name']))
