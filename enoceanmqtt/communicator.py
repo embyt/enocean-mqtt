@@ -19,6 +19,7 @@ class Communicator:
         # setup mqtt connection
         self.mqtt = mqtt.Client()
         self.mqtt.on_connect = self._on_connect
+        self.mqtt.on_message = self._on_mqtt_message
         if 'mqtt_user' in self.conf:
             logging.info("Authenticating: " + self.conf['mqtt_user'])
             self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
@@ -33,9 +34,51 @@ class Communicator:
         if self.enocean is not None and self.enocean.is_alive():
             self.enocean.stop()
 
-    def _on_connect(self, client, userdata, flags, rc):
+    def _on_connect(self, mqtt_client, userdata, flags, rc):
         '''callback for when the client receives a CONNACK response from the MQTT server.'''
         logging.info("Connected to MQTT broker with result code "+str(rc))
+        # listen to enocean send requests
+        for cur_sensor in self.sensors:
+            mqtt_client.subscribe(cur_sensor['name']+'/req/#')
+
+    def _on_mqtt_message(self, mqtt_client, userdata, msg):
+        '''the callback for when a PUBLISH message is received from the MQTT server.'''
+        # search for sensor
+        for cur_sensor in self.sensors:
+            if cur_sensor['name'] in msg.topic:
+                # store data for this sensor
+                if 'data' not in cur_sensor:
+                    cur_sensor['data'] = {}
+                prop = msg.topic[len(cur_sensor['name']+"/req/"):]
+                cur_sensor['data'][prop] = int(msg.payload)
+
+
+    def _read_packet(self, packet):
+        '''interpret packet, read properties and publish to MQTT'''
+        # search for fitting sensor
+        found_property = False
+        for cur_sensor in self.sensors:
+            if packet.sender == cur_sensor['address']:
+                if packet.type == PACKET.RADIO and packet.rorg == cur_sensor['rorg']:
+                    properties = packet.parse_eep(cur_sensor['func'], cur_sensor['type'])
+                    for prop_name in properties:
+                        found_property = True
+                        cur_prop = packet.parsed[prop_name]
+                        if isinstance(cur_prop['value'], numbers.Number):
+                            value = cur_prop['value']
+                        else:
+                            value = cur_prop['raw_value']
+                        logging.info("{}: {} ({})={} {}".format(cur_sensor['name'], prop_name, cur_prop['description'], cur_prop['value'], cur_prop['unit']))
+                        self.mqtt.publish(cur_sensor['name']+"/"+prop_name, value)
+                    break
+        if not found_property:
+            logging.warn('message not interpretable: {}'.format(found_sensor['name']))
+    
+    
+    def _reply_packet(self, packet, sensor):
+        '''send enocean message as a reply to an incoming message'''
+        logging.info('sending {} to {}'.format(sensor['data']['CV'], packet.sender))
+        # self.enocean.send(Packet(PACKET.COMMON_COMMAND, [0x08]))
 
 
     def run(self):
@@ -64,24 +107,12 @@ class Communicator:
                     logging.info('unknown sensor: {}'.format(hex(packet.sender)))
                     continue
 
-                # search for fitting sensor
-                found_property = False
-                for cur_sensor in self.sensors:
-                    if packet.sender == cur_sensor['address']:
-                        if packet.type == PACKET.RADIO and packet.rorg == cur_sensor['rorg']:
-                            properties = packet.parse_eep(cur_sensor['func'], cur_sensor['type'])
-                            for prop_name in properties:
-                                found_property = True
-                                cur_prop = packet.parsed[prop_name]
-                                if isinstance(cur_prop['value'], numbers.Number):
-                                    value = cur_prop['value']
-                                else:
-                                    value = cur_prop['raw_value']
-                                logging.info("{}: {} ({})={} {}".format(cur_sensor['name'], prop_name, cur_prop['description'], cur_prop['value'], cur_prop['unit']))
-                                self.mqtt.publish(cur_sensor['name']+"/"+prop_name, value)
-                            break
-                if not found_property:
-                    logging.warn('message not interpretable: {}'.format(found_sensor['name']))
+                # interpret packet, read properties and publish to MQTT
+                self._read_packet(packet)
+                
+                # check for neccessary reply
+                if 'data' in found_sensor:
+                    self._reply_packet(packet, found_sensor)
 
             except queue.Empty:
                 continue
