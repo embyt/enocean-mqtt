@@ -77,8 +77,27 @@ class Communicator:
     
     def _reply_packet(self, packet, sensor):
         '''send enocean message as a reply to an incoming message'''
-        logging.info('sending {} to {}'.format(sensor['data']['CV'], packet.sender))
-        # self.enocean.send(Packet(PACKET.COMMON_COMMAND, [0x08]))
+        p = Packet(PACKET.RADIO)
+        # create data
+        cv = 100
+        temp = 0x79 # int(255/40 * 21)
+        flags = 0
+        data = [ cv, temp, flags, 0x8 ]
+        sender = [ (int(self.conf['enocean_sender'], 0) >> i & 0xff) for i in (24,16,8,0) ]
+        sender = [ 0, 0xff, 0xff, 0xff ]
+        status = 0  # not repeated
+        p.data = [ RORG.BS4 ] + data + sender + [ status ]
+        
+        # optional data
+        sub_tel_num = 3
+        destination = [ 255, 255, 255, 255 ]    # broadcast
+        dbm = 0xff
+        security = 0
+        p.optional = [ sub_tel_num ] + destination + [ dbm ] + [ security ]
+        
+        # send it
+        logging.info('sending: {}'.format(p))
+        self.enocean.send(p)
 
 
     def run(self):
@@ -87,6 +106,11 @@ class Communicator:
             try:
                 # get next packet
                 packet = self.enocean.receive.get(block=True, timeout=1)
+                
+                # check packet type
+                if packet.type != PACKET.RADIO:
+                    logging.info("got non-RF packet: {}".format(packet))
+                    continue
                 
                 # first, look whether we have this sensor configured
                 found_sensor = False
