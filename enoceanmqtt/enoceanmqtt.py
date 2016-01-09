@@ -20,15 +20,17 @@ def load_config_file():
     # extract sensor configuration
     sensors = []
     for section in conf.sections():
-        new_sens = {'name': conf['DEFAULT']['mqtt_prefix'] + section}
-        for key in ('address', 'rorg', 'func', 'type', 'ignore'):
-            try:
-                new_sens[key] = int(conf[section][key], 0)
-            except KeyError:
-                new_sens[key] = None
-        sensors.append(new_sens)
-    # general configuration is part of DEFAULT section
-    return sensors, conf['DEFAULT']
+        # omit special CONFIG section
+        if section != 'CONFIG':
+            new_sens = {'name': conf['CONFIG']['mqtt_prefix'] + section}
+            for key in conf[section]:
+                try:
+                    new_sens[key] = int(conf[section][key], 0)
+                except KeyError:
+                    new_sens[key] = None
+            sensors.append(new_sens)
+    # general configuration is part of CONFIG section
+    return sensors, conf['CONFIG']
 
 
 def setup_logging():
