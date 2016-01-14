@@ -2,6 +2,8 @@
 
 This Python module receives messages from an EnOcean interface (e.g. via USB) and publishes selected messages to an MQTT broker.
 
+You may also configure it to answer to incoming EnOcean messages with outgoing responses. The response content is also defined using MQTT requests.
+
 It builds upon the [Python EnOcean](https://github.com/kipe/enocean) library.
 
 ## Installation ##

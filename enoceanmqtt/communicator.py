@@ -81,34 +81,41 @@ class Communicator:
             logging.info("learn request received")
 
 
-    def _reply_packet(self, packet, sensor):
+    def _reply_packet(self, in_packet, sensor):
         '''send enocean message as a reply to an incoming message'''
         p = Packet(PACKET.RADIO)
+        p.rorg = in_packet.rorg
         sender = [ (int(self.conf['enocean_sender'], 0) >> i & 0xff) for i in (24,16,8,0) ]
         status = 0  # not repeated
         
         # assemble data based on packet type (learn / data)
-        if not packet.learn:
+        if not in_packet.learn:
             # data packet received
+            p.select_eep(sensor['func'], sensor['type'])
             # start with default data
             data = [ (sensor['default_data'] >> i & 0xff) for i in (24,16,8,0) ]
-            # temporary override data
-            #data[0] = 100
+            p.data = [ p.rorg ] + data + sender + [ status ]
+            # do we have specific data to send?
+            if 'data' in sensor:
+                # override with specific data settings
+                p.set_eep(sensor['data'])
+            else:
+                # what to do if we have no data to send yet?
+                logging.warn('sending default data as answer to %s', sensor['name'])
+
         else:
             # learn request received
             # copy packet content from request
-            data = packet.data[1:5]
+            data = in_packet.data[1:5]
             # update flags to acknowledge learn request
             data[3] = 0xf0
+            p.data = [ p.rorg ] + data + sender + [ status ]
 
-        # optional data
+        # set optional data
         sub_tel_num = 3
         destination = [ 255, 255, 255, 255 ]    # broadcast
         dbm = 0xff
         security = 0
-
-        # assemble packet
-        p.data = [ packet.rorg ] + data + sender + [ status ]
         p.optional = [ sub_tel_num ] + destination + [ dbm ] + [ security ]
 
         # send it
