@@ -61,21 +61,27 @@ class Communicator:
             found_property = False
             for cur_sensor in self.sensors:
                 if packet.sender == cur_sensor['address']:
+                    # sensor configured in config file
                     if packet.type == PACKET.RADIO and packet.rorg == cur_sensor['rorg']:
+                        # radio packet of proper rorg type received; parse EEP
                         properties = packet.parse_eep(cur_sensor['func'], cur_sensor['type'])
+                        # loop through all EEP properties
                         for prop_name in properties:
                             found_property = True
                             cur_prop = packet.parsed[prop_name]
+                            # we only extract numeric values, either the scaled ones or the raw values for enums
                             if isinstance(cur_prop['value'], numbers.Number):
                                 value = cur_prop['value']
                             else:
                                 value = cur_prop['raw_value']
+                            # publish extracted information
                             logging.info("{}: {} ({})={} {}".format(cur_sensor['name'], prop_name, cur_prop['description'], cur_prop['value'], cur_prop['unit']))
-                            self.mqtt.publish(cur_sensor['name']+"/"+prop_name, value)
+                            retain = 'persistent' in cur_sensor and cur_sensor['persistent']
+                            self.mqtt.publish(cur_sensor['name']+"/"+prop_name, value, retain=retain)
                         break
             if not found_property:
                 logging.warn('message not interpretable: {}'.format(found_sensor['name']))
-    
+
         else:
             # learn request received
             logging.info("learn request received")
