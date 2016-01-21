@@ -92,6 +92,8 @@ class Communicator:
         p = Packet(PACKET.RADIO)
         p.rorg = in_packet.rorg
         sender = [ (int(self.conf['enocean_sender'], 0) >> i & 0xff) for i in (24,16,8,0) ]
+        # as last address byte take the byte sum of the sender address
+        sender[3] = sum([ (in_packet.sender >> i & 0xff) for i in (24,16,8,0) ]) & 0xff
         status = 0  # not repeated
         
         # assemble data based on packet type (learn / data)
