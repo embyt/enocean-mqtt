@@ -30,6 +30,8 @@ class Communicator:
         # setup enocean communication
         self.enocean = SerialCommunicator(self.conf['enocean_port'])
         self.enocean.start()
+        # setup default sender, which should not be needed because address is determined automatically
+        self.enocean_sender = [ 255, 255, 0, 0 ]
 
     def __del__(self):
         if self.enocean is not None and self.enocean.is_alive():
@@ -96,7 +98,6 @@ class Communicator:
     def _reply_packet(self, in_packet, sensor):
         '''send enocean message as a reply to an incoming message'''
         # prepare addresses
-        sender = [ (int(self.conf['enocean_sender'], 0) >> i & 0xff) for i in (24,16,8,0) ]
         destination = [ (in_packet.sender >> i & 0xff) for i in (24,16,8,0) ]
 
         # prepare packet
@@ -106,7 +107,7 @@ class Communicator:
         else:
             direction = None
         p = RadioPacket.create(rorg=RORG.BS4, func=sensor['func'], type=sensor['type'], direction=direction,
-                sender=sender, destination=destination, learn=in_packet.learn)
+                sender=self.enocean_sender, destination=destination, learn=in_packet.learn)
 
         # assemble data based on packet type (learn / data)
         if not in_packet.learn:
@@ -162,6 +163,14 @@ class Communicator:
 
 
     def run(self):
+        # Request transmitter ID
+        cmd = Packet(PACKET.COMMON_COMMAND, [0x08])
+        self.enocean.send(cmd)
+        # get response
+        packet = self.enocean.receive.get(block=True, timeout=1)
+        if packet.type == PACKET.RESPONSE and packet.data[0] == RETURN_CODE.OK:
+            self.enocean_sender = packet.response_data[:]
+
         while self.enocean.is_alive():
             # Loop to empty the queue...
             try:
