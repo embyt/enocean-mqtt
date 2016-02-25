@@ -5,6 +5,7 @@ import numbers
 from enocean.communicators.serialcommunicator import SerialCommunicator
 from enocean.protocol.packet import Packet, RadioPacket
 from enocean.protocol.constants import PACKET, RORG, RETURN_CODE
+import enocean.utils
 import paho.mqtt.client as mqtt
 
 
@@ -67,9 +68,9 @@ class Communicator:
             # search for fitting sensor
             found_property = False
             for cur_sensor in self.sensors:
-                if packet.sender == cur_sensor['address']:
+                if enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
                     # sensor configured in config file
-                    if packet.type == PACKET.RADIO and packet.rorg == cur_sensor['rorg']:
+                    if packet.packet_type == PACKET.RADIO and packet.rorg == cur_sensor['rorg']:
                         # radio packet of proper rorg type received; parse EEP
                         direction = cur_sensor['direction'] if 'direction' in cur_sensor else None
                         properties = packet.parse_eep(cur_sensor['func'], cur_sensor['type'], direction)
@@ -98,7 +99,7 @@ class Communicator:
     def _reply_packet(self, in_packet, sensor):
         '''send enocean message as a reply to an incoming message'''
         # prepare addresses
-        destination = [ (in_packet.sender >> i & 0xff) for i in (24,16,8,0) ]
+        destination = in_packet.sender
 
         # prepare packet
         if 'direction' in sensor:
@@ -106,18 +107,18 @@ class Communicator:
             direction = 1 if sensor['direction'] == 2 else 2
         else:
             direction = None
-        p = RadioPacket.create(rorg=RORG.BS4, func=sensor['func'], type=sensor['type'], direction=direction,
+        packet = RadioPacket.create(RORG.BS4, sensor['func'], sensor['type'], direction=direction,
                 sender=self.enocean_sender, destination=destination, learn=in_packet.learn)
 
         # assemble data based on packet type (learn / data)
         if not in_packet.learn:
             # data packet received
             # start with default data
-            p.data[1:5] = [ (sensor['default_data'] >> i & 0xff) for i in (24,16,8,0) ]
+            packet.data[1:5] = [ (sensor['default_data'] >> i & 0xff) for i in (24,16,8,0) ]
             # do we have specific data to send?
             if 'data' in sensor:
                 # override with specific data settings
-                p.set_eep(sensor['data'])
+                packet.set_eep(sensor['data'])
             else:
                 # what to do if we have no data to send yet?
                 logging.warn('sending default data as answer to %s', sensor['name'])
@@ -125,20 +126,20 @@ class Communicator:
         else:
             # learn request received
             # copy EEP and manufacturer ID
-            p.data[1:5] = in_packet.data[1:5]
+            packet.data[1:5] = in_packet.data[1:5]
             # update flags to acknowledge learn request
-            p.data[4] = 0xf0
+            packet.data[4] = 0xf0
 
         # send it
-        logging.info('sending: {}'.format(p))
-        self.enocean.send(p)
+        logging.info('sending: {}'.format(packet))
+        self.enocean.send(packet)
 
     
     def _process_radio_packet(self, packet):
         # first, look whether we have this sensor configured
         found_sensor = False
         for cur_sensor in self.sensors:
-            if packet.sender == cur_sensor['address']:
+            if enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
                 found_sensor = cur_sensor
         
         # skip ignored sensors
@@ -151,7 +152,7 @@ class Communicator:
 
         # abort loop if sensor not found
         if not found_sensor:
-            logging.info('unknown sensor: {}'.format(hex(packet.sender)))
+            logging.info('unknown sensor: {}'.format(enocean.utils.to_hex_string(packet.sender)))
             return
 
         # interpret packet, read properties and publish to MQTT
@@ -164,13 +165,9 @@ class Communicator:
 
     def run(self):
         # Request transmitter ID
-        cmd = Packet(PACKET.COMMON_COMMAND, [0x08])
-        self.enocean.send(cmd)
-        # get response
-        packet = self.enocean.receive.get(block=True, timeout=1)
-        if packet.type == PACKET.RESPONSE and packet.data[0] == RETURN_CODE.OK:
-            self.enocean_sender = packet.response_data[:]
+        self.enocean_sender = self.enocean.base_id
 
+        # start endless loop for listening
         while self.enocean.is_alive():
             # Loop to empty the queue...
             try:
@@ -178,9 +175,9 @@ class Communicator:
                 packet = self.enocean.receive.get(block=True, timeout=1)
                 
                 # check packet type
-                if packet.type == PACKET.RADIO:
+                if packet.packet_type == PACKET.RADIO:
                     self._process_radio_packet(packet)
-                elif packet.type == PACKET.RESPONSE:
+                elif packet.packet_type == PACKET.RESPONSE:
                     response_code = RETURN_CODE(packet.data[0])
                     logging.info("got response packet: {}".format(response_code.name))
                 else:
