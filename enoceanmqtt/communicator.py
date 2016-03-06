@@ -22,6 +22,7 @@ class Communicator:
         self.mqtt.on_connect = self._on_connect
         self.mqtt.on_disconnect = self._on_disconnect
         self.mqtt.on_message = self._on_mqtt_message
+        self.mqtt.on_publish = self._on_mqtt_publish
         if 'mqtt_user' in self.conf:
             logging.info("Authenticating: " + self.conf['mqtt_user'])
             self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
@@ -58,7 +59,15 @@ class Communicator:
                 if 'data' not in cur_sensor:
                     cur_sensor['data'] = {}
                 prop = msg.topic[len(cur_sensor['name']+"/req/"):]
-                cur_sensor['data'][prop] = int(msg.payload)
+                try:
+                    cur_sensor['data'][prop] = int(msg.payload)
+                except ValueError:
+                    logging.warning("Cannot parse int value for %s: %s", msg.topic, msg.payload)
+
+    def _on_mqtt_publish(self, mqtt_client, userdata, mid):
+        '''the callback for when a PUBLISH message is successfully sent to the MQTT server.'''
+        #logging.debug("Published MQTT message "+str(mid))
+        pass
 
 
     def _read_packet(self, packet):
