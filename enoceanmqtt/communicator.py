@@ -32,8 +32,8 @@ class Communicator:
         # setup enocean communication
         self.enocean = SerialCommunicator(self.conf['enocean_port'])
         self.enocean.start()
-        # setup default sender, which should not be needed because address is determined automatically
-        self.enocean_sender = [ 255, 255, 0, 0 ]
+        # sender will be automatically determined
+        self.enocean_sender = None
 
     def __del__(self):
         if self.enocean is not None and self.enocean.is_alive():
@@ -173,11 +173,12 @@ class Communicator:
 
 
     def run(self):
-        # Request transmitter ID
-        self.enocean_sender = self.enocean.base_id
-
         # start endless loop for listening
         while self.enocean.is_alive():
+            # Request transmitter ID, if needed
+            if self.enocean_sender is None:
+                self.enocean_sender = self.enocean.base_id
+
             # Loop to empty the queue...
             try:
                 # get next packet
