@@ -156,7 +156,7 @@ class Communicator:
             return
 
         # log packet, if not disabled
-        if self.conf['log_packets']:
+        if int(self.conf['log_packets']):
             logging.info('received: {}'.format(packet))
 
         # abort loop if sensor not found

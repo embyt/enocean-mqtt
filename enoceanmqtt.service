@@ -1,6 +1,6 @@
 [Unit]
 Description=EnOcean MQTT Forwarder
-After=mosquitto
+After=mosquitto.service
 
 [Service]
 Type=simple
