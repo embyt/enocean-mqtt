@@ -13,6 +13,15 @@ class Communicator:
     mqtt = None
     enocean = None
 
+    CONNECTION_RETURN_CODE = [
+        "connection successful",
+        "incorrect protocol version",
+        "invalid client identifier",
+        "server unavailable",
+        "bad username or password",
+        "not authorised",
+    ]
+    
     def __init__(self, config, sensors):
         self.conf = config
         self.sensors = sensors
@@ -41,14 +50,20 @@ class Communicator:
 
     def _on_connect(self, mqtt_client, userdata, flags, rc):
         '''callback for when the client receives a CONNACK response from the MQTT server.'''
-        logging.info("Connected to MQTT broker with result code "+str(rc))
-        # listen to enocean send requests
-        for cur_sensor in self.sensors:
-            mqtt_client.subscribe(cur_sensor['name']+'/req/#')
+        if rc == 0:
+            logging.info("Succesfully connected to MQTT broker.")
+            # listen to enocean send requests
+            for cur_sensor in self.sensors:
+                mqtt_client.subscribe(cur_sensor['name']+'/req/#')
+        else:
+            logging.error("Error connecting to MQTT broker: %s", self.CONNECTION_RETURN_CODE[rc])
 
     def _on_disconnect(self, mqtt_client, userdata, rc):
         '''callback for when the client disconnects from the MQTT server.'''
-        logging.warning("Disconnected from MQTT broker with code "+str(rc))
+        if rc == 0:
+            logging.warning("Successfully disconnected from MQTT broker")
+        else:
+            logging.warning("Unexpectedly disconnected from MQTT broker: "+str(rc))
 
     def _on_mqtt_message(self, mqtt_client, userdata, msg):
         '''the callback for when a PUBLISH message is received from the MQTT server.'''
@@ -72,13 +87,14 @@ class Communicator:
 
     def _read_packet(self, packet):
         '''interpret packet, read properties and publish to MQTT'''
-        if not packet.learn:
-            # data packet received
-            # search for fitting sensor
-            found_property = False
-            for cur_sensor in self.sensors:
-                if enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
-                    # sensor configured in config file
+        # loop through all configured devices
+        for cur_sensor in self.sensors:
+            # does this sensor match?
+            if enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
+                # found sensor configured in config file
+                if not packet.learn or ('log_learn' in cur_sensor and cur_sensor['log_learn']):
+                    # data packet received
+                    found_property = False
                     if packet.packet_type == PACKET.RADIO and packet.rorg == cur_sensor['rorg']:
                         # radio packet of proper rorg type received; parse EEP
                         direction = cur_sensor['direction'] if 'direction' in cur_sensor else None
@@ -97,12 +113,11 @@ class Communicator:
                             retain = 'persistent' in cur_sensor and cur_sensor['persistent']
                             self.mqtt.publish(cur_sensor['name']+"/"+prop_name, value, retain=retain)
                         break
-            if not found_property:
-                logging.warn('message not interpretable: {}'.format(found_sensor['name']))
-
-        else:
-            # learn request received
-            logging.info("learn request received")
+                    if not found_property:
+                        logging.warn('message not interpretable: {}'.format(found_sensor['name']))
+                else:
+                    # learn request received
+                    logging.info("learn request not emitted to mqtt")
 
 
     def _reply_packet(self, in_packet, sensor):
