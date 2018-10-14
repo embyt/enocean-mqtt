@@ -24,6 +24,11 @@ Assuming you want this tool to run as a daemon, which get automatically started 
  - `systemctl enable enoceanmqtt`
  - `systemctl start enoceanmqtt`
 
+### Setup as a docker container ###
+
+- Mount the `/config` volume and your enocean USB device
+- Adapt the `enoceanmqtt.conf` file in the `/config` folder
+
 ### Define persistant device name for EnOcean interface ###
 
 If you own an USB EnOcean interface and use it together with some other USB devices you may face the situation that the EnOcean interface gets different device names depending on your plugging and unplugging sequence, such as `/dev/ttyUSB0`or `/dev/ttyUSB1`. You would need to always adapt your config file then.
