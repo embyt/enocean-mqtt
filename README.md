@@ -38,3 +38,13 @@ To solve this you can make an udev rule that assigns a symbolic name to the devi
 `SUBSYSTEM=="tty", ATTRS{product}=="EnOcean USB 300 DB", SYMLINK+="enocean"`
 
 After reboot, this assigns the symbolic name `/dev/enocean`. If you use a different enocean interface, you may want to check the product string by looking into `dmesg` and search for the corresponding entry here. Alternatively you can check `udevadm info -a -n /dev/ttyUSB0`, assuming that the interface is currently mapped to `ttyUSB0`.
+
+## Configuration ##
+
+Please take a look at the provided [enoceanmqtt.conf](enoceanmqtt.conf) sample config file. Most should be self explaining.
+
+### Answering EnOcean Messages ###
+
+To answer EnOcean messages you configure the `answer` switch and the `default_data` in the config file. To customize the response data you publish an MQTT message to the sensor topic where you prefix the topic with `/req`.
+
+An example: If you want to set the valve position (set point) of a heating actuator named `heating` (e.g. with `rorg = 0xA5`, `func = 0x20`, `type = 0x01`) to 80 % you publish the integer value 80 to the topic `enocean/heating/req/SP`. This replaces the corresponding part of `default_data`.
