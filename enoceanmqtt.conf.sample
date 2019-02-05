@@ -13,17 +13,19 @@ mqtt_prefix     = enocean/
 # all other sections define the sensors to monitor
 
 [switch]
-address     = 0xfefee192
-rorg        = 0xf6   # BS1
-func        = 0x02
-type        = 0x02
-log_learn   = 1
+address         = 0xfefee192
+rorg            = 0xf6   # BS1
+func            = 0x02
+type            = 0x02
+log_learn       = 1
+publish_rssi    = 1
 
 [temperature]
-address     = 0x01823FFA
-rorg        = 0xA5
-func        = 0x02
-type        = 0x05
+address         = 0x01823FFA
+rorg            = 0xA5
+func            = 0x02
+type            = 0x05
+persistent      = 1
 
 [hvac_actuator]
 address = 0xFFDC9500
@@ -35,5 +37,5 @@ answer          = 1
 default_data    = 0x32790008
 
 [non_interesting]
-address = 0xFFD05085
-ignore = 1
+address         = 0xFFD05085
+ignore          = 1

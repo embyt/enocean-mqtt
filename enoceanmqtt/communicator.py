@@ -92,6 +92,8 @@ class Communicator:
             # does this sensor match?
             if enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
                 # found sensor configured in config file
+                if 'publish_rssi' in cur_sensor and cur_sensor['publish_rssi']:
+                    self.mqtt.publish(cur_sensor['name']+"/RSSI", packet.dBm)
                 if not packet.learn or ('log_learn' in cur_sensor and cur_sensor['log_learn']):
                     # data packet received
                     found_property = False
