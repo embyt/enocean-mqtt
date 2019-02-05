@@ -10,7 +10,7 @@ It builds upon the [Python EnOcean](https://github.com/kipe/enocean) library.
 
  - download this repository to an arbritary directory
  - install it using `python3 setup.py develop`
- - adapt the `enoceanmqtt.conf` file
+ - adapt the `enoceanmqtt.conf.sample` file and put it to /etc/enoceanmqtt.conf
    - set the enocean interface port
    - define the MQTT broker address
    - define the sensors to monitor

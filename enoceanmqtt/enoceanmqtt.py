@@ -13,9 +13,10 @@ def load_config_file():
     if len(sys.argv) > 1:
         conf_file = sys.argv[1]
     else:
-        conf_file = "enoceanmqtt.conf"
+        conf_file = "/etc/enoceanmqtt.conf"
     if not conf.read(conf_file):
         logging.error("Cannot read config file: {}".format(conf_file))
+        sys.exit(1)
 
     # extract sensor configuration
     sensors = []
