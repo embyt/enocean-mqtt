@@ -1,9 +1,9 @@
-FROM pypy:3-slim
+FROM python:3.6-alpine3.8
 
 VOLUME /config
 
 COPY . /
-RUN chmod +x /docker-entrypoint.sh && pypy3 setup.py develop
+RUN python setup.py develop
 
-WORKDIR /config
-ENTRYPOINT /docker-entrypoint.sh
+WORKDIR /
+ENTRYPOINT ["python", "/usr/local/bin/enoceanmqtt", "/enoceanmqtt-default.conf /config/enoceanmqtt.conf"]
