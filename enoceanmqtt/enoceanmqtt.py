@@ -9,29 +9,37 @@ from enoceanmqtt.communicator import Communicator
 
 
 def load_config_file():
-    conf = ConfigParser(inline_comment_prefixes=('#', ';'))
-    if len(sys.argv) > 1:
-        conf_file = sys.argv[1]
-    else:
-        conf_file = "/etc/enoceanmqtt.conf"
-    if not conf.read(conf_file):
-        logging.error("Cannot read config file: {}".format(conf_file))
-        sys.exit(1)
-
     # extract sensor configuration
     sensors = []
-    for section in conf.sections():
-        # omit special CONFIG section
-        if section != 'CONFIG':
-            new_sens = {'name': conf['CONFIG']['mqtt_prefix'] + section}
-            for key in conf[section]:
-                try:
-                    new_sens[key] = int(conf[section][key], 0)
-                except KeyError:
-                    new_sens[key] = None
-            sensors.append(new_sens)
-    # general configuration is part of CONFIG section
-    return sensors, conf['CONFIG']
+    global_config = {}
+
+    for conf_file in ["/etc/enoceanmqtt.conf"] + sys.argv[1:]:
+        conf = ConfigParser(inline_comment_prefixes=('#', ';'))
+        if not os.path.isfile(conf_file):
+            logging.warning("Config file {} does not exist, skipping".format(conf_file))
+            continue
+        logging.info("Loading config file {}".format(conf_file))
+        if not conf.read(conf_file):
+            logging.error("Cannot read config file: {}".format(conf_file))
+            sys.exit(1)
+
+        for section in conf.sections():
+            if section == 'CONFIG':
+                # general configuration is part of CONFIG section
+                for key in conf[section]:
+                    global_config[key] = conf[section][key]
+            else:
+                new_sens = {'name': conf['CONFIG']['mqtt_prefix'] + section}
+                for key in conf[section]:
+                    try:
+                        new_sens[key] = int(conf[section][key], 0)
+                    except KeyError:
+                        new_sens[key] = None
+                    sensors.append(new_sens)
+                    logging.info("Created sensor: {}".format(new_sens))
+
+    logging.info("Global config: {}".format(global_config))
+    return sensors, global_config
 
 
 def setup_logging():
