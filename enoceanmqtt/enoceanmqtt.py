@@ -3,6 +3,7 @@ import logging
 import sys
 import os
 import traceback
+import copy
 from configparser import ConfigParser
 
 from enoceanmqtt.communicator import Communicator
@@ -38,7 +39,11 @@ def load_config_file():
                 sensors.append(new_sens)
                 logging.debug("Created sensor: {}".format(new_sens))
 
-    logging.debug("Global config: {}".format(global_config))
+    logging_global_config = copy.deepcopy(global_config)
+    if "mqtt_pwd" in logging_global_config:
+        logging_global_config["mqtt_pwd"] = "*****"
+    logging.debug("Global config: {}".format(logging_global_config))
+
     return sensors, global_config
 
 
@@ -68,7 +73,7 @@ def main():
     # setup logger
     #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
     setup_logging()
-    
+
     # load config file
     sensors, conf = load_config_file()
 
