@@ -19,7 +19,7 @@ It builds upon the [Python EnOcean](https://github.com/kipe/enocean) library.
 
 ### Setup as a daemon ###
 
-Assuming you want this tool to run as a daemon, which get automatically started by systemd:
+Assuming you want this tool to run as a daemon, which gets automatically started by systemd:
  - copy the `enoceanmqtt.service` to `/etc/systemd/system/` (making only a symbolic link [will not work](https://bugzilla.redhat.com/show_bug.cgi?id=955379))
  - `systemctl enable enoceanmqtt`
  - `systemctl start enoceanmqtt`
@@ -41,7 +41,7 @@ After reboot, this assigns the symbolic name `/dev/enocean`. If you use a differ
 
 ## Configuration ##
 
-Please take a look at the provided [enoceanmqtt.conf](enoceanmqtt.conf) sample config file. Most should be self explaining.
+Please take a look at the provided [enoceanmqtt.conf.sample](enoceanmqtt.conf.sample) sample config file. Most should be self explaining.
 
 Multiple config files can be specified as command line arguments. Values are merged, later config files override values of the former. This is the order:
 
