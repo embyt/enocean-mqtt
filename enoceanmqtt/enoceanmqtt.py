@@ -35,10 +35,10 @@ def load_config_file():
                         new_sens[key] = int(conf[section][key], 0)
                     except KeyError:
                         new_sens[key] = None
-                    sensors.append(new_sens)
-                    logging.info("Created sensor: {}".format(new_sens))
+                sensors.append(new_sens)
+                logging.debug("Created sensor: {}".format(new_sens))
 
-    logging.info("Global config: {}".format(global_config))
+    logging.debug("Global config: {}".format(global_config))
     return sensors, global_config
 
 
