@@ -38,7 +38,8 @@ class Communicator:
         if 'mqtt_user' in self.conf:
             logging.info("Authenticating: " + self.conf['mqtt_user'])
             self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
-        self.mqtt.connect_async(self.conf['mqtt_host'], port=int(self.conf['mqtt_port']), keepalive=int(self.conf['mqtt_keepalive']))
+        self.mqtt.connect_async(self.conf['mqtt_host'], port=int(self.conf['mqtt_port']), 
+                keepalive=int(self.conf['mqtt_keepalive']) if 'mqtt_keepalive' in self.conf else 0)
         self.mqtt.loop_start()
 
         # setup enocean communication
