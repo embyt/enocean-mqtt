@@ -1,6 +1,8 @@
 import logging
 import queue
 import numbers
+import json
+import platform
 
 from enocean.communicators.serialcommunicator import SerialCommunicator
 from enocean.protocol.packet import Packet, RadioPacket
@@ -27,7 +29,8 @@ class Communicator:
         self.sensors = sensors
         
         # setup mqtt connection
-        self.mqtt = mqtt.Client()
+        client_id = self.conf['mqtt_client_id'] if 'mqtt_client_id' in self.conf else ''
+        self.mqtt = mqtt.Client(client_id=client_id)
         self.mqtt.on_connect = self._on_connect
         self.mqtt.on_disconnect = self._on_disconnect
         self.mqtt.on_message = self._on_mqtt_message
@@ -35,7 +38,7 @@ class Communicator:
         if 'mqtt_user' in self.conf:
             logging.info("Authenticating: " + self.conf['mqtt_user'])
             self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
-        self.mqtt.connect(self.conf['mqtt_host'], int(self.conf['mqtt_port'],0))
+        self.mqtt.connect_async(self.conf['mqtt_host'], port=int(self.conf['mqtt_port']), keepalive=int(self.conf['mqtt_keepalive']))
         self.mqtt.loop_start()
 
         # setup enocean communication
@@ -87,13 +90,18 @@ class Communicator:
 
     def _read_packet(self, packet):
         '''interpret packet, read properties and publish to MQTT'''
+        mqtt_publish_json = self.conf['mqtt_publish_json'] if 'mqtt_publish_json' in self.conf else False
+        mqtt_json = { }
         # loop through all configured devices
         for cur_sensor in self.sensors:
             # does this sensor match?
             if enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
                 # found sensor configured in config file
                 if 'publish_rssi' in cur_sensor and cur_sensor['publish_rssi']:
-                    self.mqtt.publish(cur_sensor['name']+"/RSSI", packet.dBm)
+                    if mqtt_publish_json:
+                        mqtt_json['RSSI'] = packet.dBm
+                    else:
+                        self.mqtt.publish(cur_sensor['name']+"/RSSI", packet.dBm)
                 if not packet.learn or ('log_learn' in cur_sensor and cur_sensor['log_learn']):
                     # data packet received
                     found_property = False
@@ -113,10 +121,17 @@ class Communicator:
                             # publish extracted information
                             logging.debug("{}: {} ({})={} {}".format(cur_sensor['name'], prop_name, cur_prop['description'], cur_prop['value'], cur_prop['unit']))
                             retain = 'persistent' in cur_sensor and cur_sensor['persistent']
-                            self.mqtt.publish(cur_sensor['name']+"/"+prop_name, value, retain=retain)
-                        break
+                            if mqtt_publish_json:
+                                mqtt_json[prop_name] = value
+                            else:
+                                self.mqtt.publish(cur_sensor['name']+"/"+prop_name, value, retain=retain)
                     if not found_property:
                         logging.warn('message not interpretable: {}'.format(found_sensor['name']))
+                    elif mqtt_publish_json:
+                        name = cur_sensor['name']
+                        value = json.dumps(mqtt_json)
+                        logging.debug("{}: Sent MQTT: {}".format(name, value))
+                        self.mqtt.publish(name, value, retain=retain)
                 else:
                     # learn request received
                     logging.info("learn request not emitted to mqtt")
@@ -199,7 +214,11 @@ class Communicator:
             # Loop to empty the queue...
             try:
                 # get next packet
-                packet = self.enocean.receive.get(block=True, timeout=1)
+                if (platform.system() == 'Windows'):
+                    # only timeout on Windows for KeyboardInterrupt checking
+                    packet = self.enocean.receive.get(block=True, timeout=1)
+                else:
+                    packet = self.enocean.receive.get(block=True)
                 
                 # check packet type
                 if packet.packet_type == PACKET.RADIO:
@@ -212,3 +231,13 @@ class Communicator:
                     continue
             except queue.Empty:
                 continue
+            except KeyboardInterrupt:
+                logging.debug("Exception: KeyboardInterrupt")
+                break
+
+        # Run finished, close MQTT client and stop Enocean thread
+        logging.debug("Cleaning up")
+        self.mqtt.loop_stop()
+        self.mqtt.disconnect()
+        self.mqtt.loop_forever() # will block until disconnect complete
+        self.enocean.stop()

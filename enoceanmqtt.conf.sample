@@ -1,16 +1,25 @@
-# the general section defines parameter for the mqtt broker and the enocean interface
+## the general section defines parameter for the mqtt broker and the enocean interface
 [CONFIG]
 enocean_port    = /dev/enocean
 log_packets     = 1
 
 mqtt_host       = localhost
 mqtt_port       = 1883
-# the prefix is used for the mqtt value names; this is extended by the sensor name
+mqtt_client_id  = enocean
+mqtt_keepalive  = 0
+
+## the prefix is used for the mqtt value names; this is extended by the sensor name
 mqtt_prefix     = enocean/
-# optionally also set mqtt_user and mqtt_pwd
+
+## publish received packets as single MQTT message with a JSON payload
+# mqtt_publish_json = true
+
+## optionally also set mqtt_user and mqtt_pwd
+# mqtt_user       = mqtt
+# mqtt_pwd        = password
 
 
-# all other sections define the sensors to monitor
+## all other sections define the sensors to monitor
 
 [switch]
 address         = 0xfefee192

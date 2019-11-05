@@ -4,17 +4,37 @@ import sys
 import os
 import traceback
 import copy
+import argparse
 from configparser import ConfigParser
 
 from enoceanmqtt.communicator import Communicator
 
+conf = {
+    'debug': False,
+    'config': ['/etc/enoceanmqtt.conf'],
+    'logfile': os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'enoceanmqtt.log')
+}
 
-def load_config_file():
+def parse_args():
+    """ Parse command line arguments. """
+    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
+    parser.add_argument('--debug', help='enable console debugging',
+        action='store_true')
+    parser.add_argument('--logfile', help='set log file location')
+    parser.add_argument('config', help='specify config file[s]', nargs='*')
+    # parser.add_argument('--version', help='show application version',
+    #     action='version', version='%(prog)s ' + VERSION)
+    args = vars(parser.parse_args())
+    # logging.info('Read arguments: ' + str(args))
+    return args
+
+
+def load_config_file(config_files):
     # extract sensor configuration
     sensors = []
     global_config = {}
 
-    for conf_file in ["/etc/enoceanmqtt.conf"] + sys.argv[1:]:
+    for conf_file in config_files:
         conf = ConfigParser(inline_comment_prefixes=('#', ';'))
         if not os.path.isfile(conf_file):
             logging.warning("Config file {} does not exist, skipping".format(conf_file))
@@ -47,44 +67,48 @@ def load_config_file():
     return sensors, global_config
 
 
-def setup_logging():
-    # set root logger to highest log level
-    logging.getLogger().setLevel(logging.DEBUG)
+def setup_logging(log_filename='', log_file_level=logging.INFO, debug=False):
+    # create formatter
+    log_formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
 
-    # create file and console handler
-    log_filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'enoceanmqtt.log')
-    log_file = logging.FileHandler(log_filename)
-    log_file.setLevel(logging.INFO)
+    # set root logger to lowest log level
+    logging.getLogger().setLevel(logging.DEBUG if debug else log_file_level)
+
+    # create console and log file handlers and the formatter to the handlers
     log_console = logging.StreamHandler()
-    log_console.setLevel(logging.DEBUG)
-
-    # create formatter and add it to the handlers
-    formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
-    log_file.setFormatter(formatter)
-    log_console.setFormatter(formatter)
-
-    # add the handlers to the logger
-    logging.getLogger().addHandler(log_file)
+    log_console.setFormatter(log_formatter)
+    log_console.setLevel(logging.DEBUG if debug else logging.ERROR)
     logging.getLogger().addHandler(log_console)
-
+    if log_filename:
+        log_file = logging.FileHandler(log_filename)
+        log_file.setLevel(log_file_level)
+        log_file.setFormatter(log_formatter)
+        logging.getLogger().addHandler(log_file)
+        logging.info("Logging to file: {}".format(log_filename))
+    if debug:
+        logging.info("Logging debug to console")
 
 def main():
     """entry point if called as an executable"""
+    # logging.getLogger().setLevel(logging.DEBUG)
+    # Parse command line arguments
+    conf.update(parse_args())
+
     # setup logger
-    #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-    setup_logging()
+    setup_logging(conf['logfile'], debug=conf['debug'])
 
     # load config file
-    sensors, conf = load_config_file()
+    sensors, global_config = load_config_file(conf['config'])
+    conf.update(global_config)
 
     # start working
     com = Communicator(conf, sensors)
     try:
         com.run()
-    # catch all possible exceptions
-    except Exception:     # pylint: disable=broad-except
-        logging.error(traceback.format_exc())
 
+    # catch all possible exceptions
+    except:     # pylint: disable=broad-except
+        logging.error(traceback.format_exc())
 
 # check for execution
 if __name__ == "__main__":
