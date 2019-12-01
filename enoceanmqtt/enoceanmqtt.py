@@ -50,7 +50,9 @@ def load_config_file(config_files):
                 for key in conf[section]:
                     global_config[key] = conf[section][key]
             else:
-                new_sens = {'name': conf['CONFIG']['mqtt_prefix'] + section}
+                mqtt_prefix = conf['CONFIG']['mqtt_prefix'] \
+                    if 'mqtt_prefix' in conf['CONFIG'] else "enocean/"
+                new_sens = {'name': mqtt_prefix + section}
                 for key in conf[section]:
                     try:
                         new_sens[key] = int(conf[section][key], 0)
