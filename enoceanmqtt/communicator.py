@@ -44,6 +44,12 @@ class Communicator:
         if 'mqtt_user' in self.conf:
             logging.info("Authenticating: " + self.conf['mqtt_user'])
             self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
+        if 'mqtt_ssl' in self.conf:
+            logging.info("Enabling SSL")
+            ca_certs = self.conf['mqtt_ssl_ca_certs'] if 'mqtt_ssl_ca_certs' in self.conf else None
+            certfile = self.conf['mqtt_ssl_certfile'] if 'mqtt_ssl_certfile' in self.conf else None
+            keyfile = self.conf['mqtt_ssl_keyfile'] if 'mqtt_ssl_keyfile' in self.conf else None
+            self.mqtt.tls_set(ca_certs=ca_certs, certfile=certfile, keyfile=keyfile)
         self.mqtt.connect_async(self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
         self.mqtt.loop_start()
 

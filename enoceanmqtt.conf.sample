@@ -18,6 +18,15 @@ mqtt_prefix     = enocean/
 # mqtt_user       = mqtt
 # mqtt_pwd        = password
 
+## enable SSL on MQTT connection
+## Ensure that mqtt_host contains the FQDN for correct certificate verification
+## mqtt_ssl_ca_certs: CA certificates to be treated as trusted
+## mqtt_ssl_certfile, mqtt_ssl_keyfile: Client certificate and private key.
+##     Only required if the server requires the client to authenticate.
+# mqtt_ssl        = true
+# mqtt_ssl_ca_certs = /path/CA_files_merged.pem
+# mqtt_ssl_certfile = /path/client_cert.pem
+# mqtt_ssl_keyfile = /path/client_key.pem
 
 ## all other sections define the sensors to monitor
 
