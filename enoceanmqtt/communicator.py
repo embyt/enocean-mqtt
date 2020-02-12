@@ -27,7 +27,13 @@ class Communicator:
     def __init__(self, config, sensors):
         self.conf = config
         self.sensors = sensors
-        
+
+        # check for mandatory configuration
+        if 'mqtt_host' not in self.conf or 'enocean_port' not in self.conf:
+            raise Exception("Mandatory configuration not found: mqtt_host/enocean_port")
+        mqtt_port = int(self.conf['mqtt_port']) if 'mqtt_port' in self.conf else 1883
+        mqtt_keepalive = int(self.conf['mqtt_keepalive']) if 'mqtt_keepalive' in self.conf else 0
+
         # setup mqtt connection
         client_id = self.conf['mqtt_client_id'] if 'mqtt_client_id' in self.conf else ''
         self.mqtt = mqtt.Client(client_id=client_id)
@@ -38,7 +44,7 @@ class Communicator:
         if 'mqtt_user' in self.conf:
             logging.info("Authenticating: " + self.conf['mqtt_user'])
             self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
-        self.mqtt.connect_async(self.conf['mqtt_host'], port=int(self.conf['mqtt_port']), keepalive=int(self.conf['mqtt_keepalive']))
+        self.mqtt.connect_async(self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
         self.mqtt.loop_start()
 
         # setup enocean communication
@@ -188,7 +194,7 @@ class Communicator:
             return
 
         # log packet, if not disabled
-        if int(self.conf['log_packets']):
+        if 'log_packets' in self.conf and int(self.conf['log_packets']):
             logging.info('received: {}'.format(packet))
 
         # abort loop if sensor not found
