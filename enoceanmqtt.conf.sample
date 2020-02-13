@@ -25,9 +25,8 @@ mqtt_prefix     = enocean/
 ## mqtt_ssl_ca_certs: CA certificates to be treated as trusted. Required if
 ##     the MQTT broker is configured with a self-signed certificate.
 ## mqtt_ssl_certfile, mqtt_ssl_keyfile: Client certificate and private key.
-##     Only required if the server requires the client to authenticate.
-## mqtt_ssl_insecure: Disable verification of mqtt_host with the broker's
-##     certificate credentials.
+##     Only required if the broker requires clients to present a certificate.
+## mqtt_ssl_insecure: Disable verification of the broker's certificate.
 ##     WARNING: do NOT use on production systems as this is insecure!
 ##
 # mqtt_ssl          = true
