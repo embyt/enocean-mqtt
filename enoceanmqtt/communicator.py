@@ -50,6 +50,9 @@ class Communicator:
             certfile = self.conf['mqtt_ssl_certfile'] if 'mqtt_ssl_certfile' in self.conf else None
             keyfile = self.conf['mqtt_ssl_keyfile'] if 'mqtt_ssl_keyfile' in self.conf else None
             self.mqtt.tls_set(ca_certs=ca_certs, certfile=certfile, keyfile=keyfile)
+            if 'mqtt_ssl_insecure' in self.conf:
+                logging.warning("Disabling SSL certificate verification")
+                self.mqtt.tls_insecure_set(True)
         self.mqtt.connect_async(self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
         self.mqtt.loop_start()
 
