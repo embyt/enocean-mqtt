@@ -55,6 +55,7 @@ class Communicator:
                 self.mqtt.tls_insecure_set(True)
         if 'mqtt_debug' in self.conf and self.conf['mqtt_debug'] == 'true':
              self.mqtt.enable_logger()
+        logging.debug("Connecting to host " + self.conf['mqtt_host'] + ", port " + str(mqtt_port) + ", keepalive " + str(mqtt_keepalive))
         self.mqtt.connect_async(self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
         self.mqtt.loop_start()
 

@@ -14,7 +14,7 @@ mqtt_prefix     = enocean/
 ## publish received packets as single MQTT message with a JSON payload
 # mqtt_publish_json = true
 
-## optionally also set mqtt_user and mqtt_pwd
+## optionally also set mqtt_user and mqtt_pwd (don't use quotes).
 # mqtt_user       = mqtt
 # mqtt_pwd        = password
 
@@ -34,6 +34,9 @@ mqtt_prefix     = enocean/
 # mqtt_ssl_certfile = /path/client_cert.pem
 # mqtt_ssl_keyfile  = /path/client_key.pem
 # mqtt_ssl_insecure = true
+
+## Enable MQTT debugging. Requires --debug on the command line.
+# mqtt_debug      = true
 
 ## all other sections define the sensors to monitor
 
