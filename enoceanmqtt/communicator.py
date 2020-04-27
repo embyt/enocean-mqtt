@@ -1,3 +1,6 @@
+# Copyright (c) 2020 embyt GmbH. See LICENSE for further details.
+# Author: Roman Morawek <roman.morawek@embyt.com>
+"""this class handles the enocean and mqtt interfaces"""
 import logging
 import queue
 import numbers

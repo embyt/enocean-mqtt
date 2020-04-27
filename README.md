@@ -8,8 +8,14 @@ It builds upon the [Python EnOcean](https://github.com/kipe/enocean) library.
 
 ## Installation ##
 
+enocean-mqtt is available on PyPI and can be installed using pip:
+ - sudo pip3 install enocean-mqtt
+
+Alternatively, install the latest release directly from github:
  - download this repository to an arbritary directory
  - install it using `python3 setup.py develop`
+
+Afterwards, perform configuration:
  - adapt the `enoceanmqtt.conf.sample` file and put it to /etc/enoceanmqtt.conf
    - set the enocean interface port
    - define the MQTT broker address

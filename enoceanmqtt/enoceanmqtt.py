@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2020 embyt GmbH. See LICENSE for further details.
+# Author: Roman Morawek <roman.morawek@embyt.com>
+"""this is the main entry point, which sets up the Communicator class"""
 import logging
 import sys
 import os

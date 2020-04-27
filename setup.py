@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
+# Copyright (c) 2020 embyt GmbH. See LICENSE for further details.
+# Author: Roman Morawek <roman.morawek@embyt.com>
 """setup module for enoceanmqtt"""
-
-# prefer setuptools over distutils
-from setuptools import setup, find_packages
+import setuptools
 
 # needed packages
 REQUIRES = [
@@ -9,26 +10,29 @@ REQUIRES = [
     'paho-mqtt',
 ]
 
-setup(
-    name='enoceanmqtt',
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
+setuptools.setup(
+    name='enocean-mqtt',
     version='0.1.0',
-    description='',
-    url='http://romor.github.io/enocean-mqtt',
     author='Roman Morawek',
-    author_email='maemo@morawek.at',
+    author_email='roman.morawek@embyt.com',
+    description='Receives messages from an enOcean serial interface (USB) and provides selected messages to an MQTT broker.',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url='https://github.com/embyt/enocean-mqtt',
     license='GPLv3',
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
     ],
     keywords='enOcean MQTT IoT',
-    packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
+    packages=setuptools.find_packages(exclude=['contrib', 'docs', 'tests*']),
     install_requires=REQUIRES,
 
     # To provide executable scripts, use entry points in preference to the
