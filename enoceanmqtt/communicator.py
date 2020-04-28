@@ -84,7 +84,7 @@ class Communicator:
         if rc == 0:
             logging.warning("Successfully disconnected from MQTT broker")
         else:
-            logging.warning("Unexpectedly disconnected from MQTT broker: "+str(rc))
+            logging.warning("Unexpectedly disconnected from MQTT broker: " + self.CONNECTION_RETURN_CODE[rc])
 
     def _on_mqtt_message(self, mqtt_client, userdata, msg):
         '''the callback for when a PUBLISH message is received from the MQTT server.'''
