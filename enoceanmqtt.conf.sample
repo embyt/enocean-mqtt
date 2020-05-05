@@ -5,8 +5,11 @@ log_packets     = 1
 
 mqtt_host       = localhost
 mqtt_port       = 1883
-mqtt_client_id  = enocean
-mqtt_keepalive  = 0
+mqtt_client_id  = enocean   # ensure that this is unique if you use multiple clients
+
+## setting mqtt_keepalive = 0 sets the timeout to infinitive but does not work reliably
+## due to an upstream issue https://github.com/eclipse/paho.mqtt.python/issues/473
+mqtt_keepalive  = 60
 
 ## the prefix is used for the mqtt value names; this is extended by the sensor name
 mqtt_prefix     = enocean/
