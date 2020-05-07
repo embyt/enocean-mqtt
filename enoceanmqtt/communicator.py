@@ -118,17 +118,17 @@ class Communicator:
             # does this sensor match?
             if enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
                 # found sensor configured in config file
-                if 'publish_rssi' in cur_sensor and cur_sensor['publish_rssi']:
+                if str(cur_sensor.get('publish_rssi')) in ("True", "true", "1"):
                     if mqtt_publish_json:
                         mqtt_json['RSSI'] = packet.dBm
                     else:
                         self.mqtt.publish(cur_sensor['name']+"/RSSI", packet.dBm)
-                if not packet.learn or ('log_learn' in cur_sensor and cur_sensor['log_learn']):
+                if not packet.learn or str(cur_sensor.get('log_learn')) in ("True", "true", "1"):
                     # data packet received
                     found_property = False
                     if packet.packet_type == PACKET.RADIO and packet.rorg == cur_sensor['rorg']:
                         # radio packet of proper rorg type received; parse EEP
-                        direction = cur_sensor['direction'] if 'direction' in cur_sensor else None
+                        direction = cur_sensor.get('direction')
                         properties = packet.parse_eep(cur_sensor['func'], cur_sensor['type'], direction)
                         # loop through all EEP properties
                         for prop_name in properties:
@@ -141,7 +141,7 @@ class Communicator:
                                 value = cur_prop['raw_value']
                             # publish extracted information
                             logging.debug("{}: {} ({})={} {}".format(cur_sensor['name'], prop_name, cur_prop['description'], cur_prop['value'], cur_prop['unit']))
-                            retain = 'persistent' in cur_sensor and cur_sensor['persistent']
+                            retain = str(cur_sensor.get('persistent')) in ("True", "true", "1")
                             if mqtt_publish_json:
                                 mqtt_json[prop_name] = value
                             else:
@@ -221,7 +221,7 @@ class Communicator:
         self._read_packet(packet)
         
         # check for neccessary reply
-        if 'answer' in found_sensor and found_sensor['answer']:
+        if str(found_sensor.get('answer')) in ("True", "true", "1"):
             self._reply_packet(packet, found_sensor)
 
 
