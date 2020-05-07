@@ -47,16 +47,16 @@ class Communicator:
         if 'mqtt_user' in self.conf:
             logging.info("Authenticating: " + self.conf['mqtt_user'])
             self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
-        if 'mqtt_ssl' in self.conf and self.conf['mqtt_ssl'] == 'true':
+        if str(self.conf.get('mqtt_ssl')) in ("True", "true", "1"):
             logging.info("Enabling SSL")
             ca_certs = self.conf['mqtt_ssl_ca_certs'] if 'mqtt_ssl_ca_certs' in self.conf else None
             certfile = self.conf['mqtt_ssl_certfile'] if 'mqtt_ssl_certfile' in self.conf else None
             keyfile = self.conf['mqtt_ssl_keyfile'] if 'mqtt_ssl_keyfile' in self.conf else None
             self.mqtt.tls_set(ca_certs=ca_certs, certfile=certfile, keyfile=keyfile)
-            if 'mqtt_ssl_insecure' in self.conf:
+            if str(self.conf.get('mqtt_ssl_insecure')) in ("True", "true", "1"):
                 logging.warning("Disabling SSL certificate verification")
                 self.mqtt.tls_insecure_set(True)
-        if 'mqtt_debug' in self.conf and self.conf['mqtt_debug'] == 'true':
+        if str(self.conf.get('mqtt_debug')) in ("True", "true", "1"):
              self.mqtt.enable_logger()
         logging.debug("Connecting to host " + self.conf['mqtt_host'] + ", port " + str(mqtt_port) + ", keepalive " + str(mqtt_keepalive))
         self.mqtt.connect_async(self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
@@ -111,7 +111,7 @@ class Communicator:
 
     def _read_packet(self, packet):
         '''interpret packet, read properties and publish to MQTT'''
-        mqtt_publish_json = self.conf['mqtt_publish_json'] if 'mqtt_publish_json' in self.conf else False
+        mqtt_publish_json = True if 'mqtt_publish_json' in self.conf and self.conf['mqtt_publish_json'] == "True" else False
         mqtt_json = { }
         # loop through all configured devices
         for cur_sensor in self.sensors:
@@ -209,7 +209,7 @@ class Communicator:
             return
 
         # log packet, if not disabled
-        if 'log_packets' in self.conf and int(self.conf['log_packets']):
+        if str(self.conf.get('log_packets')) in ("True", "true", "1"):
             logging.info('received: {}'.format(packet))
 
         # abort loop if sensor not found
