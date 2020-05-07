@@ -47,7 +47,7 @@ class Communicator:
         if 'mqtt_user' in self.conf:
             logging.info("Authenticating: " + self.conf['mqtt_user'])
             self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
-        if 'mqtt_ssl' in self.conf:
+        if 'mqtt_ssl' in self.conf and self.conf['mqtt_ssl'] == 'true':
             logging.info("Enabling SSL")
             ca_certs = self.conf['mqtt_ssl_ca_certs'] if 'mqtt_ssl_ca_certs' in self.conf else None
             certfile = self.conf['mqtt_ssl_certfile'] if 'mqtt_ssl_certfile' in self.conf else None
@@ -56,6 +56,9 @@ class Communicator:
             if 'mqtt_ssl_insecure' in self.conf:
                 logging.warning("Disabling SSL certificate verification")
                 self.mqtt.tls_insecure_set(True)
+        if 'mqtt_debug' in self.conf and self.conf['mqtt_debug'] == 'true':
+             self.mqtt.enable_logger()
+        logging.debug("Connecting to host " + self.conf['mqtt_host'] + ", port " + str(mqtt_port) + ", keepalive " + str(mqtt_keepalive))
         self.mqtt.connect_async(self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
         self.mqtt.loop_start()
 
@@ -84,7 +87,7 @@ class Communicator:
         if rc == 0:
             logging.warning("Successfully disconnected from MQTT broker")
         else:
-            logging.warning("Unexpectedly disconnected from MQTT broker: "+str(rc))
+            logging.warning("Unexpectedly disconnected from MQTT broker: " + self.CONNECTION_RETURN_CODE[rc])
 
     def _on_mqtt_message(self, mqtt_client, userdata, msg):
         '''the callback for when a PUBLISH message is received from the MQTT server.'''
@@ -144,7 +147,7 @@ class Communicator:
                             else:
                                 self.mqtt.publish(cur_sensor['name']+"/"+prop_name, value, retain=retain)
                     if not found_property:
-                        logging.warn('message not interpretable: {}'.format(found_sensor['name']))
+                        logging.warn('message not interpretable: {}'.format(cur_sensor['name']))
                     elif mqtt_publish_json:
                         name = cur_sensor['name']
                         value = json.dumps(mqtt_json)
