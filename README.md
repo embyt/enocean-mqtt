@@ -10,7 +10,7 @@ It builds upon the [Python EnOcean](https://github.com/kipe/enocean) library.
 
 ## Installation ##
 
-enocean-mqtt is available on PyPI and can be installed using pip:
+enocean-mqtt is available on [PyPI](https://pypi.org/project/enocean-mqtt/) and can be installed using pip:
  - `pip install enocean-mqtt`
 
 Alternatively, install the latest release directly from github:
