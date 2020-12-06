@@ -111,7 +111,7 @@ class Communicator:
 
     def _read_packet(self, packet):
         '''interpret packet, read properties and publish to MQTT'''
-        mqtt_publish_json = True if 'mqtt_publish_json' in self.conf and self.conf['mqtt_publish_json'] == "True" else False
+        mqtt_publish_json = ('mqtt_publish_json' in self.conf and self.conf['mqtt_publish_json'] in ("True", "true", "1"))
         mqtt_json = { }
         # loop through all configured devices
         for cur_sensor in self.sensors:
