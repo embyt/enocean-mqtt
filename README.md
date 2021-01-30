@@ -48,6 +48,17 @@ To solve this you can make an udev rule that assigns a symbolic name to the devi
 
 After reboot, this assigns the symbolic name `/dev/enocean`. If you use a different enocean interface, you may want to check the product string by looking into `dmesg` and search for the corresponding entry here. Alternatively you can check `udevadm info -a -n /dev/ttyUSB0`, assuming that the interface is currently mapped to `ttyUSB0`.
 
+### Using with the EnOcean Raspberry Pi Hat ###
+
+This module works with the [element14 EnOcean Raspberry Pi Hat](https://www.element14.com/community/docs/DOC-55169). The hat presents the EnOcean transceiver to the system as device `/dev/ttyAMA0`, set `enocean_port` to this device in your configuration file.
+
+Depending on your Raspberry Pi model, you may need to enable the serial port and/or disable the Linux serial console using `raspi-config`. See **Disable Linux serial console** in the [Raspberry Pi UART documentation](https://www.raspberrypi.org/documentation/configuration/uart.md) for the procedure.
+
+Additionally, for the Raspberry Pi 3, you will need to disable the built-in Bluetooth controller as there is a hardware conflict between the EnOcean Hat and the Bluetooth controller (they both use the same hardware clock.) To do this, add the following line to `/boot/config.txt` and reboot:
+```ini
+dtoverlay=disable-bt
+```
+
 ## Configuration ##
 
 Please take a look at the provided [enoceanmqtt.conf.sample](enoceanmqtt.conf.sample) sample config file. Most should be self explaining.
