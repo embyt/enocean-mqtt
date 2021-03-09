@@ -18,6 +18,7 @@ conf = {
     'logfile': os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'enoceanmqtt.log')
 }
 
+
 def parse_args():
     """ Parse command line arguments. """
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
@@ -81,7 +82,7 @@ def setup_logging(log_filename='', log_file_level=logging.INFO, debug=False):
     # create console and log file handlers and the formatter to the handlers
     log_console = logging.StreamHandler()
     log_console.setFormatter(log_formatter)
-    log_console.setLevel(logging.DEBUG if debug else logging.ERROR)
+    log_console.setLevel(logging.DEBUG if debug else logging.WARNING)
     logging.getLogger().addHandler(log_console)
     if log_filename:
         log_file = logging.FileHandler(log_filename)
@@ -91,6 +92,7 @@ def setup_logging(log_filename='', log_file_level=logging.INFO, debug=False):
         logging.info("Logging to file: {}".format(log_filename))
     if debug:
         logging.info("Logging debug to console")
+
 
 def main():
     """entry point if called as an executable"""
@@ -113,6 +115,7 @@ def main():
     # catch all possible exceptions
     except:     # pylint: disable=broad-except
         logging.error(traceback.format_exc())
+
 
 # check for execution
 if __name__ == "__main__":
