@@ -26,7 +26,7 @@ class Communicator:
         "bad username or password",
         "not authorised",
     ]
-    
+
     def __init__(self, config, sensors):
         self.conf = config
         self.sensors = sensors
@@ -57,8 +57,9 @@ class Communicator:
                 logging.warning("Disabling SSL certificate verification")
                 self.mqtt.tls_insecure_set(True)
         if str(self.conf.get('mqtt_debug')) in ("True", "true", "1"):
-             self.mqtt.enable_logger()
-        logging.debug("Connecting to host " + self.conf['mqtt_host'] + ", port " + str(mqtt_port) + ", keepalive " + str(mqtt_keepalive))
+            self.mqtt.enable_logger()
+        logging.debug("Connecting to host " + self.conf['mqtt_host'] +
+                      ", port " + str(mqtt_port) + ", keepalive " + str(mqtt_keepalive))
         self.mqtt.connect_async(self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
         self.mqtt.loop_start()
 
@@ -87,32 +88,41 @@ class Communicator:
         if rc == 0:
             logging.warning("Successfully disconnected from MQTT broker")
         else:
-            logging.warning("Unexpectedly disconnected from MQTT broker: " + self.CONNECTION_RETURN_CODE[rc])
+            logging.warning("Unexpectedly disconnected from MQTT broker: %s",
+                            self.CONNECTION_RETURN_CODE[rc])
 
     def _on_mqtt_message(self, mqtt_client, userdata, msg):
         '''the callback for when a PUBLISH message is received from the MQTT server.'''
         # search for sensor
         for cur_sensor in self.sensors:
             if cur_sensor['name'] in msg.topic:
-                # store data for this sensor
-                if 'data' not in cur_sensor:
-                    cur_sensor['data'] = {}
+                # get message topic
                 prop = msg.topic[len(cur_sensor['name']+"/req/"):]
-                try:
-                    cur_sensor['data'][prop] = int(msg.payload)
-                except ValueError:
-                    logging.warning("Cannot parse int value for %s: %s", msg.topic, msg.payload)
+                # do we face a send request?
+                if prop == "send":
+                    self._send_packet(cur_sensor, cur_sensor['address'])
+                else:
+                    # parse message content
+                    value = None
+                    try:
+                        value = int(msg.payload)
+                    except ValueError:
+                        logging.warning("Cannot parse int value for %s: %s", msg.topic, msg.payload)
+                    # store received data
+                    if 'data' not in cur_sensor:
+                        cur_sensor['data'] = {}
+                    cur_sensor['data'][prop] = value
 
     def _on_mqtt_publish(self, mqtt_client, userdata, mid):
         '''the callback for when a PUBLISH message is successfully sent to the MQTT server.'''
         #logging.debug("Published MQTT message "+str(mid))
         pass
 
-
     def _read_packet(self, packet):
         '''interpret packet, read properties and publish to MQTT'''
-        mqtt_publish_json = ('mqtt_publish_json' in self.conf and self.conf['mqtt_publish_json'] in ("True", "true", "1"))
-        mqtt_json = { }
+        mqtt_publish_json = (
+            'mqtt_publish_json' in self.conf and self.conf['mqtt_publish_json'] in ("True", "true", "1"))
+        mqtt_json = {}
         # loop through all configured devices
         for cur_sensor in self.sensors:
             # does this sensor match?
@@ -129,7 +139,8 @@ class Communicator:
                     if packet.packet_type == PACKET.RADIO and packet.rorg == cur_sensor['rorg']:
                         # radio packet of proper rorg type received; parse EEP
                         direction = cur_sensor.get('direction')
-                        properties = packet.parse_eep(cur_sensor['func'], cur_sensor['type'], direction)
+                        properties = packet.parse_eep(
+                            cur_sensor['func'], cur_sensor['type'], direction)
                         # loop through all EEP properties
                         for prop_name in properties:
                             found_property = True
@@ -140,12 +151,14 @@ class Communicator:
                             else:
                                 value = cur_prop['raw_value']
                             # publish extracted information
-                            logging.debug("{}: {} ({})={} {}".format(cur_sensor['name'], prop_name, cur_prop['description'], cur_prop['value'], cur_prop['unit']))
+                            logging.debug("{}: {} ({})={} {}".format(
+                                cur_sensor['name'], prop_name, cur_prop['description'], cur_prop['value'], cur_prop['unit']))
                             retain = str(cur_sensor.get('persistent')) in ("True", "true", "1")
                             if mqtt_publish_json:
                                 mqtt_json[prop_name] = value
                             else:
-                                self.mqtt.publish(cur_sensor['name']+"/"+prop_name, value, retain=retain)
+                                self.mqtt.publish(cur_sensor['name'] +
+                                                  "/"+prop_name, value, retain=retain)
                     if not found_property:
                         logging.warn('message not interpretable: {}'.format(cur_sensor['name']))
                     elif mqtt_publish_json:
@@ -157,38 +170,46 @@ class Communicator:
                     # learn request received
                     logging.info("learn request not emitted to mqtt")
 
-
     def _reply_packet(self, in_packet, sensor):
         '''send enocean message as a reply to an incoming message'''
         # prepare addresses
         destination = in_packet.sender
 
-        # prepare packet
+        self._send_packet(sensor, destination, True, in_packet.data if in_packet.learn else None)
+
+    def _send_packet(self, sensor, destination, negate_direction=False, learn_data=None):
+        '''triggers sending of an enocean packet'''
+        # determine direction indicator
         if 'direction' in sensor:
-            # we invert the direction in this reply
-            direction = 1 if sensor['direction'] == 2 else 2
+            direction = sensor['direction']
+            if negate_direction:
+                # we invert the direction in this reply
+                direction = 1 if direction == 2 else 2
         else:
             direction = None
+        # is this a response to a learn packet?
+        is_learn = True if learn_data is not None else False
+
         packet = RadioPacket.create(RORG.BS4, sensor['func'], sensor['type'], direction=direction,
-                sender=self.enocean_sender, destination=destination, learn=in_packet.learn)
+                                    sender=self.enocean_sender, destination=destination, learn=is_learn)
 
         # assemble data based on packet type (learn / data)
-        if not in_packet.learn:
+        if not is_learn:
             # data packet received
             # start with default data
-            packet.data[1:5] = [ (sensor['default_data'] >> i & 0xff) for i in (24,16,8,0) ]
+            packet.data[1:5] = [(sensor['default_data'] >> i & 0xff) for i in (24, 16, 8, 0)]
             # do we have specific data to send?
             if 'data' in sensor:
                 # override with specific data settings
                 packet.set_eep(sensor['data'])
             else:
                 # what to do if we have no data to send yet?
-                logging.warn('sending default data as answer to %s', sensor['name'])
+                logging.warning('sending default data as answer to %s', sensor['name'])
 
         else:
             # learn request received
             # copy EEP and manufacturer ID
-            packet.data[1:5] = in_packet.data[1:5]
+            packet.data[1:5] = learn_data[1:5]
             # update flags to acknowledge learn request
             packet.data[4] = 0xf0
 
@@ -196,14 +217,13 @@ class Communicator:
         logging.info('sending: {}'.format(packet))
         self.enocean.send(packet)
 
-    
     def _process_radio_packet(self, packet):
         # first, look whether we have this sensor configured
         found_sensor = False
         for cur_sensor in self.sensors:
             if enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
                 found_sensor = cur_sensor
-        
+
         # skip ignored sensors
         if found_sensor and 'ignore' in found_sensor and found_sensor['ignore']:
             return
@@ -219,11 +239,10 @@ class Communicator:
 
         # interpret packet, read properties and publish to MQTT
         self._read_packet(packet)
-        
+
         # check for neccessary reply
         if str(found_sensor.get('answer')) in ("True", "true", "1"):
             self._reply_packet(packet, found_sensor)
-
 
     def run(self):
         # start endless loop for listening
@@ -240,7 +259,7 @@ class Communicator:
                     packet = self.enocean.receive.get(block=True, timeout=1)
                 else:
                     packet = self.enocean.receive.get(block=True)
-                
+
                 # check packet type
                 if packet.packet_type == PACKET.RADIO:
                     self._process_radio_packet(packet)
@@ -260,5 +279,5 @@ class Communicator:
         logging.debug("Cleaning up")
         self.mqtt.loop_stop()
         self.mqtt.disconnect()
-        self.mqtt.loop_forever() # will block until disconnect complete
+        self.mqtt.loop_forever()  # will block until disconnect complete
         self.enocean.stop()

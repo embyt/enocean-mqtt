@@ -21,8 +21,7 @@ conf = {
 def parse_args():
     """ Parse command line arguments. """
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
-    parser.add_argument('--debug', help='enable console debugging',
-        action='store_true')
+    parser.add_argument('--debug', help='enable console debugging', action='store_true')
     parser.add_argument('--logfile', help='set log file location')
     parser.add_argument('config', help='specify config file[s]', nargs='*')
     # parser.add_argument('--version', help='show application version',
