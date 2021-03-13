@@ -38,6 +38,9 @@ Alternatively, instead of running a native deamon you may want to use Docker:
 - Mount the `/config` volume and your enocean USB device
 - Adapt the `enoceanmqtt.conf` file in the `/config` folder
 
+The volume mount has to point to -v /local/path/to/configfile:/config.
+Example docker command: `sudo docker run --name="enoceanmqtt" --device=/dev/enocean -v /volume1/docker/enocean2mqtt/config:/config volschin/enocean-mqtt:latest`.
+
 ### Define persistant device name for EnOcean interface ###
 
 If you own an USB EnOcean interface and use it together with some other USB devices you may face the situation that the EnOcean interface gets different device names depending on your plugging and unplugging sequence, such as `/dev/ttyUSB0`or `/dev/ttyUSB1`. You would need to always adapt your config file then.
@@ -71,8 +74,22 @@ Multiple config files can be specified as command line arguments. Values are mer
 
 This can be used to split security sensitive values from the device configs.
 
-### Answering EnOcean Messages ###
+## Usage ##
 
-To answer EnOcean messages you configure the `answer` switch and the `default_data` in the config file. To customize the response data you publish an MQTT message to the sensor topic where you prefix the topic with `/req`.
+### Reading EnOcean Messages ###
+
+Every EnOcean message that a configured sensor receives will get decoded according the configured `rorg`, `func`, `type` fields. Then, the decoded content will be published to MQTT.
+
+To avoid receiving MQTT messages for specific devices you have two choinces. You may either not configure it at all, but you will still see entries in the log file then on messages fron unknown devices. Alternatively you can enter the device in the configuration and set `ignore` to 1.
+
+### Sending EnOcean Messages ###
+
+To send EnOcean messages you prepare the packet data by sending MQTT request to specific fields. You typically configure the `default_data` property in the config file and afterwards customize/complete the packet by publishing an MQTT message to the device topic where you prefix the topic with `/req`.
 
 An example: If you want to set the valve position (set point) of a heating actuator named `heating` (e.g. with `rorg = 0xA5`, `func = 0x20`, `type = 0x01`) to 80 % you publish the integer value 80 to the topic `enocean/heating/req/SP`. This replaces the corresponding part of `default_data`.
+
+To finally trigger the sending of the packet, place an MQTT message to the device's `req/send` topic.
+
+### Answering EnOcean Messages ###
+
+Similar to sending EnOceam Messages you can configure it to send a packet as an answer to in incoming EnOcean packet. For this, you configure the `answer` switch in the device's configuration section. As above, you set the `default_data` in the config file and customize the response data by publishing MQTT messages to the device topic where you prefix the topic with `/req`.
