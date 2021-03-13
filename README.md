@@ -39,7 +39,9 @@ Alternatively, instead of running a native deamon you may want to use Docker:
 - Adapt the `enoceanmqtt.conf` file in the `/config` folder
 
 The volume mount has to point to -v /local/path/to/configfile:/config.
-Example docker command: `sudo docker run --name="enoceanmqtt" --device=/dev/enocean -v /volume1/docker/enocean2mqtt/config:/config volschin/enocean-mqtt:latest`.
+Example docker command:
+
+`sudo docker run --name="enoceanmqtt" --device=/dev/enocean -v /volume1/docker/enocean2mqtt/config:/config volschin/enocean-mqtt:latest`.
 
 ### Define persistant device name for EnOcean interface ###
 
