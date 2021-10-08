@@ -79,6 +79,7 @@ class Communicator:
             logging.info("Succesfully connected to MQTT broker.")
             # listen to enocean send requests
             for cur_sensor in self.sensors:
+                # logging.debug("MQTT subscribing: %s", cur_sensor['name']+'/req/#')
                 mqtt_client.subscribe(cur_sensor['name']+'/req/#')
         else:
             logging.error("Error connecting to MQTT broker: %s", self.CONNECTION_RETURN_CODE[rc])
@@ -94,14 +95,21 @@ class Communicator:
     def _on_mqtt_message(self, mqtt_client, userdata, msg):
         '''the callback for when a PUBLISH message is received from the MQTT server.'''
         # search for sensor
+        found_topic = False
+        logging.debug("Got MQTT message: %s", msg.topic)
         for cur_sensor in self.sensors:
             if cur_sensor['name'] in msg.topic:
                 # get message topic
                 prop = msg.topic[len(cur_sensor['name']+"/req/"):]
                 # do we face a send request?
                 if prop == "send":
-                    self._send_packet(cur_sensor, cur_sensor['address'])
+                    found_topic = True
+                    logging.debug("Trigger message to: %s", cur_sensor['name'])
+                    destination = [(cur_sensor['address'] >> i*8) &
+                                   0xff for i in reversed(range(4))]
+                    self._send_packet(cur_sensor, destination)
                 else:
+                    found_topic = True
                     # parse message content
                     value = None
                     try:
@@ -112,6 +120,8 @@ class Communicator:
                     if 'data' not in cur_sensor:
                         cur_sensor['data'] = {}
                     cur_sensor['data'][prop] = value
+        if not found_topic:
+            logging.warning("Unexpected MQTT message: %s", msg.topic)
 
     def _on_mqtt_publish(self, mqtt_client, userdata, mid):
         '''the callback for when a PUBLISH message is successfully sent to the MQTT server.'''
@@ -190,21 +200,26 @@ class Communicator:
         # is this a response to a learn packet?
         is_learn = True if learn_data is not None else False
 
-        packet = RadioPacket.create(RORG.BS4, sensor['func'], sensor['type'], direction=direction,
-                                    sender=self.enocean_sender, destination=destination, learn=is_learn)
+        try:
+            packet = RadioPacket.create(RORG.BS4, sensor['func'], sensor['type'], direction=direction,
+                                        sender=self.enocean_sender, destination=destination, learn=is_learn)
+        except ValueError as err:
+            logging.error("Cannot create RF packet: %s", err)
+            return
 
         # assemble data based on packet type (learn / data)
         if not is_learn:
             # data packet received
             # start with default data
-            packet.data[1:5] = [(sensor['default_data'] >> i & 0xff) for i in (24, 16, 8, 0)]
+            default_data = sensor['default_data'] if 'default_data' in sensor else 0
+            packet.data[1:5] = [(default_data >> i*8) & 0xff for i in reversed(range(4))]
             # do we have specific data to send?
             if 'data' in sensor:
                 # override with specific data settings
                 packet.set_eep(sensor['data'])
             else:
                 # what to do if we have no data to send yet?
-                logging.warning('sending default data as answer to %s', sensor['name'])
+                logging.warning('sending only default data as answer to %s', sensor['name'])
 
         else:
             # learn request received

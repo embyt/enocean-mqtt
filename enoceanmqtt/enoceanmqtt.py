@@ -62,7 +62,7 @@ def load_config_file(config_files):
                     except KeyError:
                         new_sens[key] = None
                 sensors.append(new_sens)
-                logging.debug("Created sensor: {}".format(new_sens))
+                logging.debug("Created sensor: %s", new_sens)
 
     logging_global_config = copy.deepcopy(global_config)
     if "mqtt_pwd" in logging_global_config:
