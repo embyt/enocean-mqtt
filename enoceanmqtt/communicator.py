@@ -9,7 +9,7 @@ import platform
 
 from enocean.communicators.serialcommunicator import SerialCommunicator
 from enocean.protocol.packet import Packet, RadioPacket
-from enocean.protocol.constants import PACKET, RORG, RETURN_CODE
+from enocean.protocol.constants import PACKET, RETURN_CODE
 import enocean.utils
 import paho.mqtt.client as mqtt
 
@@ -201,7 +201,7 @@ class Communicator:
         is_learn = True if learn_data is not None else False
 
         try:
-            packet = RadioPacket.create(RORG.BS4, sensor['func'], sensor['type'], direction=direction,
+            packet = RadioPacket.create(sensor['rorg'], sensor['func'], sensor['type'], direction=direction,
                                         sender=self.enocean_sender, destination=destination, learn=is_learn)
         except ValueError as err:
             logging.error("Cannot create RF packet: %s", err)
