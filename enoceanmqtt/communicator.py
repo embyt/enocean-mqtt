@@ -236,7 +236,7 @@ class Communicator:
         # first, look whether we have this sensor configured
         found_sensor = False
         for cur_sensor in self.sensors:
-            if enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
+            if 'address' in cur_sensor and enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
                 found_sensor = cur_sensor
 
         # skip ignored sensors
