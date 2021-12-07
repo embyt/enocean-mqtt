@@ -117,6 +117,7 @@ class Communicator:
                     except ValueError:
                         logging.warning("Cannot parse int value for %s: %s", msg.topic, msg.payload)
                     # store received data
+                    logging.debug("%s: %s=%s", cur_sensor['name'], prop, value)
                     if 'data' not in cur_sensor:
                         cur_sensor['data'] = {}
                     cur_sensor['data'][prop] = value
@@ -216,7 +217,9 @@ class Communicator:
             # do we have specific data to send?
             if 'data' in sensor:
                 # override with specific data settings
+                logging.debug("sensor data: %s", sensor['data'])
                 packet.set_eep(sensor['data'])
+                packet.parse_eep()  # ensure that the logging output of packet is updated
             else:
                 # what to do if we have no data to send yet?
                 logging.warning('sending only default data as answer to %s', sensor['name'])
