@@ -33,32 +33,33 @@ def parse_args():
 
 
 def load_config_file(config_files):
+    """load sensor and general configuration from given config files"""
     # extract sensor configuration
     sensors = []
     global_config = {}
 
     for conf_file in config_files:
-        conf = ConfigParser(inline_comment_prefixes=('#', ';'))
+        config_parser = ConfigParser(inline_comment_prefixes=('#', ';'))
         if not os.path.isfile(conf_file):
-            logging.warning("Config file {} does not exist, skipping".format(conf_file))
+            logging.warning("Config file %s does not exist, skipping", conf_file)
             continue
-        logging.info("Loading config file {}".format(conf_file))
-        if not conf.read(conf_file):
-            logging.error("Cannot read config file: {}".format(conf_file))
+        logging.info("Loading config file %s", conf_file)
+        if not config_parser.read(conf_file):
+            logging.error("Cannot read config file: %s", conf_file)
             sys.exit(1)
 
-        for section in conf.sections():
+        for section in config_parser.sections():
             if section == 'CONFIG':
                 # general configuration is part of CONFIG section
-                for key in conf[section]:
-                    global_config[key] = conf[section][key]
+                for key in config_parser[section]:
+                    global_config[key] = config_parser[section][key]
             else:
-                mqtt_prefix = conf['CONFIG']['mqtt_prefix'] \
-                    if 'mqtt_prefix' in conf['CONFIG'] else "enocean/"
+                mqtt_prefix = config_parser['CONFIG']['mqtt_prefix'] \
+                    if 'mqtt_prefix' in config_parser['CONFIG'] else "enocean/"
                 new_sens = {'name': mqtt_prefix + section}
-                for key in conf[section]:
+                for key in config_parser[section]:
                     try:
-                        new_sens[key] = int(conf[section][key], 0)
+                        new_sens[key] = int(config_parser[section][key], 0)
                     except KeyError:
                         new_sens[key] = None
                 sensors.append(new_sens)
@@ -67,12 +68,13 @@ def load_config_file(config_files):
     logging_global_config = copy.deepcopy(global_config)
     if "mqtt_pwd" in logging_global_config:
         logging_global_config["mqtt_pwd"] = "*****"
-    logging.debug("Global config: {}".format(logging_global_config))
+    logging.debug("Global config: %s", logging_global_config)
 
     return sensors, global_config
 
 
 def setup_logging(log_filename='', log_file_level=logging.INFO, debug=False):
+    """initialize python logging infrastructure"""
     # create formatter
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
 
@@ -89,7 +91,7 @@ def setup_logging(log_filename='', log_file_level=logging.INFO, debug=False):
         log_file.setLevel(log_file_level)
         log_file.setFormatter(log_formatter)
         logging.getLogger().addHandler(log_file)
-        logging.info("Logging to file: {}".format(log_filename))
+        logging.info("Logging to file: %s", log_filename)
     if debug:
         logging.info("Logging debug to console")
 
@@ -113,7 +115,7 @@ def main():
         com.run()
 
     # catch all possible exceptions
-    except:     # pylint: disable=broad-except
+    except:     # pylint: disable=broad-except,bare-except
         logging.error(traceback.format_exc())
 
 

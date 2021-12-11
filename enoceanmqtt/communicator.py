@@ -8,13 +8,14 @@ import json
 import platform
 
 from enocean.communicators.serialcommunicator import SerialCommunicator
-from enocean.protocol.packet import Packet, RadioPacket
+from enocean.protocol.packet import RadioPacket
 from enocean.protocol.constants import PACKET, RETURN_CODE
 import enocean.utils
 import paho.mqtt.client as mqtt
 
 
 class Communicator:
+    """the main working class providing the MQTT interface to the enocean packet classes"""
     mqtt = None
     enocean = None
 
@@ -45,7 +46,7 @@ class Communicator:
         self.mqtt.on_message = self._on_mqtt_message
         self.mqtt.on_publish = self._on_mqtt_publish
         if 'mqtt_user' in self.conf:
-            logging.info("Authenticating: " + self.conf['mqtt_user'])
+            logging.info("Authenticating: %s", self.conf['mqtt_user'])
             self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
         if str(self.conf.get('mqtt_ssl')) in ("True", "true", "1"):
             logging.info("Enabling SSL")
@@ -58,8 +59,8 @@ class Communicator:
                 self.mqtt.tls_insecure_set(True)
         if str(self.conf.get('mqtt_debug')) in ("True", "true", "1"):
             self.mqtt.enable_logger()
-        logging.debug("Connecting to host " + self.conf['mqtt_host'] +
-                      ", port " + str(mqtt_port) + ", keepalive " + str(mqtt_keepalive))
+        logging.debug("Connecting to host %s, port %s, keepalive %s",
+                      self.conf['mqtt_host'], mqtt_port, mqtt_keepalive)
         self.mqtt.connect_async(self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
         self.mqtt.loop_start()
 
@@ -73,26 +74,27 @@ class Communicator:
         if self.enocean is not None and self.enocean.is_alive():
             self.enocean.stop()
 
-    def _on_connect(self, mqtt_client, userdata, flags, rc):
+    def _on_connect(self, mqtt_client, _userdata, _flags, return_code):
         '''callback for when the client receives a CONNACK response from the MQTT server.'''
-        if rc == 0:
+        if return_code == 0:
             logging.info("Succesfully connected to MQTT broker.")
             # listen to enocean send requests
             for cur_sensor in self.sensors:
                 # logging.debug("MQTT subscribing: %s", cur_sensor['name']+'/req/#')
                 mqtt_client.subscribe(cur_sensor['name']+'/req/#')
         else:
-            logging.error("Error connecting to MQTT broker: %s", self.CONNECTION_RETURN_CODE[rc])
+            logging.error("Error connecting to MQTT broker: %s",
+                          self.CONNECTION_RETURN_CODE[return_code])
 
-    def _on_disconnect(self, mqtt_client, userdata, rc):
+    def _on_disconnect(self, _mqtt_client, _userdata, return_code):
         '''callback for when the client disconnects from the MQTT server.'''
-        if rc == 0:
+        if return_code == 0:
             logging.warning("Successfully disconnected from MQTT broker")
         else:
             logging.warning("Unexpectedly disconnected from MQTT broker: %s",
-                            self.CONNECTION_RETURN_CODE[rc])
+                            self.CONNECTION_RETURN_CODE[return_code])
 
-    def _on_mqtt_message(self, mqtt_client, userdata, msg):
+    def _on_mqtt_message(self, _mqtt_client, _userdata, msg):
         '''the callback for when a PUBLISH message is received from the MQTT server.'''
         # search for sensor
         found_topic = False
@@ -124,15 +126,14 @@ class Communicator:
         if not found_topic:
             logging.warning("Unexpected MQTT message: %s", msg.topic)
 
-    def _on_mqtt_publish(self, mqtt_client, userdata, mid):
+    def _on_mqtt_publish(self, _mqtt_client, _userdata, _mid):
         '''the callback for when a PUBLISH message is successfully sent to the MQTT server.'''
         #logging.debug("Published MQTT message "+str(mid))
-        pass
 
     def _read_packet(self, packet):
         '''interpret packet, read properties and publish to MQTT'''
-        mqtt_publish_json = (
-            'mqtt_publish_json' in self.conf and self.conf['mqtt_publish_json'] in ("True", "true", "1"))
+        mqtt_publish_json = 'mqtt_publish_json' in self.conf and \
+            self.conf['mqtt_publish_json'] in ("True", "true", "1")
         mqtt_json = {}
         # loop through all configured devices
         for cur_sensor in self.sensors:
@@ -156,14 +157,16 @@ class Communicator:
                         for prop_name in properties:
                             found_property = True
                             cur_prop = packet.parsed[prop_name]
-                            # we only extract numeric values, either the scaled ones or the raw values for enums
+                            # we only extract numeric values, either the scaled ones
+                            # or the raw values for enums
                             if isinstance(cur_prop['value'], numbers.Number):
                                 value = cur_prop['value']
                             else:
                                 value = cur_prop['raw_value']
                             # publish extracted information
-                            logging.debug("{}: {} ({})={} {}".format(
-                                cur_sensor['name'], prop_name, cur_prop['description'], cur_prop['value'], cur_prop['unit']))
+                            logging.debug("%s: %s (%s)=%s %s", cur_sensor['name'], prop_name,
+                                          cur_prop['description'], cur_prop['value'],
+                                          cur_prop['unit'])
                             retain = str(cur_sensor.get('persistent')) in ("True", "true", "1")
                             if mqtt_publish_json:
                                 mqtt_json[prop_name] = value
@@ -171,11 +174,11 @@ class Communicator:
                                 self.mqtt.publish(cur_sensor['name'] +
                                                   "/"+prop_name, value, retain=retain)
                     if not found_property:
-                        logging.warn('message not interpretable: {}'.format(cur_sensor['name']))
+                        logging.warning("message not interpretable: %s", cur_sensor['name'])
                     elif mqtt_publish_json:
                         name = cur_sensor['name']
                         value = json.dumps(mqtt_json)
-                        logging.debug("{}: Sent MQTT: {}".format(name, value))
+                        logging.debug("%s: Sent MQTT: %s", name, value)
                         self.mqtt.publish(name, value, retain=retain)
                 else:
                     # learn request received
@@ -202,8 +205,9 @@ class Communicator:
         is_learn = True if learn_data is not None else False
 
         try:
-            packet = RadioPacket.create(sensor['rorg'], sensor['func'], sensor['type'], direction=direction,
-                                        sender=self.enocean_sender, destination=destination, learn=is_learn)
+            packet = RadioPacket.create(sensor['rorg'], sensor['func'], sensor['type'],
+                                        direction=direction, sender=self.enocean_sender,
+                                        destination=destination, learn=is_learn)
         except ValueError as err:
             logging.error("Cannot create RF packet: %s", err)
             return
@@ -232,14 +236,15 @@ class Communicator:
             packet.data[4] = 0xf0
 
         # send it
-        logging.info('sending: {}'.format(packet))
+        logging.info("sending: %s", packet)
         self.enocean.send(packet)
 
     def _process_radio_packet(self, packet):
         # first, look whether we have this sensor configured
         found_sensor = False
         for cur_sensor in self.sensors:
-            if 'address' in cur_sensor and enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
+            if 'address' in cur_sensor and \
+                    enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
                 found_sensor = cur_sensor
 
         # skip ignored sensors
@@ -248,11 +253,11 @@ class Communicator:
 
         # log packet, if not disabled
         if str(self.conf.get('log_packets')) in ("True", "true", "1"):
-            logging.info('received: {}'.format(packet))
+            logging.info("received: %s", packet)
 
         # abort loop if sensor not found
         if not found_sensor:
-            logging.info('unknown sensor: {}'.format(enocean.utils.to_hex_string(packet.sender)))
+            logging.info("unknown sensor: %s", enocean.utils.to_hex_string(packet.sender))
             return
 
         # interpret packet, read properties and publish to MQTT
@@ -263,6 +268,7 @@ class Communicator:
             self._reply_packet(packet, found_sensor)
 
     def run(self):
+        """the main loop with blocking enocean packet receive handler"""
         # start endless loop for listening
         while self.enocean.is_alive():
             # Request transmitter ID, if needed
@@ -272,7 +278,7 @@ class Communicator:
             # Loop to empty the queue...
             try:
                 # get next packet
-                if (platform.system() == 'Windows'):
+                if platform.system() == 'Windows':
                     # only timeout on Windows for KeyboardInterrupt checking
                     packet = self.enocean.receive.get(block=True, timeout=1)
                 else:
@@ -283,9 +289,9 @@ class Communicator:
                     self._process_radio_packet(packet)
                 elif packet.packet_type == PACKET.RESPONSE:
                     response_code = RETURN_CODE(packet.data[0])
-                    logging.info("got response packet: {}".format(response_code.name))
+                    logging.info("got response packet: %s", response_code.name)
                 else:
-                    logging.info("got non-RF packet: {}".format(packet))
+                    logging.info("got non-RF packet: %s", packet)
                     continue
             except queue.Empty:
                 continue
