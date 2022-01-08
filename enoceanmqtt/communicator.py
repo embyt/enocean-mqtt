@@ -34,9 +34,12 @@ class Communicator:
 
         # check for mandatory configuration
         if 'mqtt_host' not in self.conf or 'enocean_port' not in self.conf:
-            raise Exception("Mandatory configuration not found: mqtt_host/enocean_port")
-        mqtt_port = int(self.conf['mqtt_port']) if 'mqtt_port' in self.conf else 1883
-        mqtt_keepalive = int(self.conf['mqtt_keepalive']) if 'mqtt_keepalive' in self.conf else 0
+            raise Exception(
+                "Mandatory configuration not found: mqtt_host/enocean_port")
+        mqtt_port = int(self.conf['mqtt_port']
+                        ) if 'mqtt_port' in self.conf else 1883
+        mqtt_keepalive = int(
+            self.conf['mqtt_keepalive']) if 'mqtt_keepalive' in self.conf else 60
 
         # setup mqtt connection
         client_id = self.conf['mqtt_client_id'] if 'mqtt_client_id' in self.conf else ''
@@ -47,13 +50,15 @@ class Communicator:
         self.mqtt.on_publish = self._on_mqtt_publish
         if 'mqtt_user' in self.conf:
             logging.info("Authenticating: %s", self.conf['mqtt_user'])
-            self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
+            self.mqtt.username_pw_set(
+                self.conf['mqtt_user'], self.conf['mqtt_pwd'])
         if str(self.conf.get('mqtt_ssl')) in ("True", "true", "1"):
             logging.info("Enabling SSL")
             ca_certs = self.conf['mqtt_ssl_ca_certs'] if 'mqtt_ssl_ca_certs' in self.conf else None
             certfile = self.conf['mqtt_ssl_certfile'] if 'mqtt_ssl_certfile' in self.conf else None
             keyfile = self.conf['mqtt_ssl_keyfile'] if 'mqtt_ssl_keyfile' in self.conf else None
-            self.mqtt.tls_set(ca_certs=ca_certs, certfile=certfile, keyfile=keyfile)
+            self.mqtt.tls_set(ca_certs=ca_certs,
+                              certfile=certfile, keyfile=keyfile)
             if str(self.conf.get('mqtt_ssl_insecure')) in ("True", "true", "1"):
                 logging.warning("Disabling SSL certificate verification")
                 self.mqtt.tls_insecure_set(True)
@@ -61,7 +66,8 @@ class Communicator:
             self.mqtt.enable_logger()
         logging.debug("Connecting to host %s, port %s, keepalive %s",
                       self.conf['mqtt_host'], mqtt_port, mqtt_keepalive)
-        self.mqtt.connect_async(self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
+        self.mqtt.connect_async(
+            self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
         self.mqtt.loop_start()
 
         # setup enocean communication
@@ -84,7 +90,8 @@ class Communicator:
                 mqtt_client.subscribe(cur_sensor['name']+'/req/#')
         else:
             logging.error("Error connecting to MQTT broker: %s",
-                          self.CONNECTION_RETURN_CODE[return_code])
+                          self.CONNECTION_RETURN_CODE[return_code]
+                          if return_code < len(self.CONNECTION_RETURN_CODE) else return_code)
 
     def _on_disconnect(self, _mqtt_client, _userdata, return_code):
         '''callback for when the client disconnects from the MQTT server.'''
@@ -92,7 +99,8 @@ class Communicator:
             logging.warning("Successfully disconnected from MQTT broker")
         else:
             logging.warning("Unexpectedly disconnected from MQTT broker: %s",
-                            self.CONNECTION_RETURN_CODE[return_code])
+                            self.CONNECTION_RETURN_CODE[return_code]
+                            if return_code < len(self.CONNECTION_RETURN_CODE) else return_code)
 
     def _on_mqtt_message(self, _mqtt_client, _userdata, msg):
         '''the callback for when a PUBLISH message is received from the MQTT server.'''
@@ -117,7 +125,8 @@ class Communicator:
                     try:
                         value = int(msg.payload)
                     except ValueError:
-                        logging.warning("Cannot parse int value for %s: %s", msg.topic, msg.payload)
+                        logging.warning(
+                            "Cannot parse int value for %s: %s", msg.topic, msg.payload)
                     # store received data
                     logging.debug("%s: %s=%s", cur_sensor['name'], prop, value)
                     if 'data' not in cur_sensor:
@@ -144,7 +153,8 @@ class Communicator:
                     if mqtt_publish_json:
                         mqtt_json['RSSI'] = packet.dBm
                     else:
-                        self.mqtt.publish(cur_sensor['name']+"/RSSI", packet.dBm)
+                        self.mqtt.publish(
+                            cur_sensor['name']+"/RSSI", packet.dBm)
                 if not packet.learn or str(cur_sensor.get('log_learn')) in ("True", "true", "1"):
                     # data packet received
                     found_property = False
@@ -167,14 +177,16 @@ class Communicator:
                             logging.debug("%s: %s (%s)=%s %s", cur_sensor['name'], prop_name,
                                           cur_prop['description'], cur_prop['value'],
                                           cur_prop['unit'])
-                            retain = str(cur_sensor.get('persistent')) in ("True", "true", "1")
+                            retain = str(cur_sensor.get('persistent')) in (
+                                "True", "true", "1")
                             if mqtt_publish_json:
                                 mqtt_json[prop_name] = value
                             else:
                                 self.mqtt.publish(cur_sensor['name'] +
                                                   "/"+prop_name, value, retain=retain)
                     if not found_property:
-                        logging.warning("message not interpretable: %s", cur_sensor['name'])
+                        logging.warning(
+                            "message not interpretable: %s", cur_sensor['name'])
                     elif mqtt_publish_json:
                         name = cur_sensor['name']
                         value = json.dumps(mqtt_json)
@@ -189,7 +201,8 @@ class Communicator:
         # prepare addresses
         destination = in_packet.sender
 
-        self._send_packet(sensor, destination, True, in_packet.data if in_packet.learn else None)
+        self._send_packet(sensor, destination, True,
+                          in_packet.data if in_packet.learn else None)
 
     def _send_packet(self, sensor, destination, negate_direction=False, learn_data=None):
         '''triggers sending of an enocean packet'''
@@ -217,7 +230,8 @@ class Communicator:
             # data packet received
             # start with default data
             default_data = sensor['default_data'] if 'default_data' in sensor else 0
-            packet.data[1:5] = [(default_data >> i*8) & 0xff for i in reversed(range(4))]
+            packet.data[1:5] = [(default_data >> i*8) &
+                                0xff for i in reversed(range(4))]
             # do we have specific data to send?
             if 'data' in sensor:
                 # override with specific data settings
@@ -226,7 +240,8 @@ class Communicator:
                 packet.parse_eep()  # ensure that the logging output of packet is updated
             else:
                 # what to do if we have no data to send yet?
-                logging.warning('sending only default data as answer to %s', sensor['name'])
+                logging.warning(
+                    'sending only default data as answer to %s', sensor['name'])
 
         else:
             # learn request received
@@ -257,7 +272,8 @@ class Communicator:
 
         # abort loop if sensor not found
         if not found_sensor:
-            logging.info("unknown sensor: %s", enocean.utils.to_hex_string(packet.sender))
+            logging.info("unknown sensor: %s",
+                         enocean.utils.to_hex_string(packet.sender))
             return
 
         # interpret packet, read properties and publish to MQTT
