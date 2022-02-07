@@ -82,3 +82,11 @@ func            = 0x05
 type            = 0x00
 # when sending, this is the data default that can be customized via MQTT
 default_data    = 0x00000000
+
+[radiator]
+address         = 0xDEADBEEF
+rorg            = 0xD2   # VLD
+func            = 0x01
+type            = 0x0C
+log_learn       = 1
+command         = CMD
