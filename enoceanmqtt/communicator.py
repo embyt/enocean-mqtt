@@ -1,3 +1,4 @@
+
 # Copyright (c) 2020 embyt GmbH. See LICENSE for further details.
 # Author: Roman Morawek <roman.morawek@embyt.com>
 """this class handles the enocean and mqtt interfaces"""
@@ -36,7 +37,7 @@ class Communicator:
         if 'mqtt_host' not in self.conf or 'enocean_port' not in self.conf:
             raise Exception("Mandatory configuration not found: mqtt_host/enocean_port")
         mqtt_port = int(self.conf['mqtt_port']) if 'mqtt_port' in self.conf else 1883
-        mqtt_keepalive = int(self.conf['mqtt_keepalive']) if 'mqtt_keepalive' in self.conf else 0
+        mqtt_keepalive = int(self.conf['mqtt_keepalive']) if 'mqtt_keepalive' in self.conf else 60
 
         # setup mqtt connection
         client_id = self.conf['mqtt_client_id'] if 'mqtt_client_id' in self.conf else ''
@@ -117,21 +118,22 @@ class Communicator:
                     command_shortcut=cur_sensor.get('command')
 
                     if command_shortcut:
+                        # Check MQTT message has valid data
                         if 'data' not in cur_sensor:
                             logging.warning('No data to send from MQTT message!')
                             return
-                        else:
-                            if command_shortcut not in cur_sensor['data']:
-                                logging.warning('Command field %s must be set in MQTT message!', command_shortcut)
-                                return
-                            else:
-                                command = cur_sensor['data'][command_shortcut]
-                                logging.debug('Retrieved command id from MQTT message: %s', hex(command))
+                        # Check MQTT message sets the command field
+                        if command_shortcut not in cur_sensor['data']:
+                            logging.warning('Command field %s must be set in MQTT message!', command_shortcut)
+                            return
+                        # Retrieve command id from MQTT message
+                        command = cur_sensor['data'][command_shortcut]
+                        logging.debug('Retrieved command id from MQTT message: %s', hex(command))
 
                     self._send_packet(cur_sensor, destination, command)
 
                     # Clear sent data
-                    del cur_sensor['data']
+                    #del cur_sensor['data']
 
                 else:
                     found_topic = True
@@ -164,11 +166,9 @@ class Communicator:
         for source in profile.contents:
             if not source.name:
                 continue
-            else:
-                # Check if the current shortcut match the command shortcut
-                if source['shortcut'] == cur_sensor.get('command'):
-                    #logging.debug('Shortcut : %s', source['shortcut'])
-                    return packet.eep._get_raw(source, packet._bit_data)
+            # Check the current shortcut matches the command shortcut
+            if source['shortcut'] == cur_sensor.get('command'):
+                return packet.eep._get_raw(source, packet._bit_data)
 
         # If not found, return None for default handling of the packet
         return None
@@ -255,11 +255,12 @@ class Communicator:
         # is this a response to a learn packet?
         is_learn = True if learn_data is not None else False
 
-        # Use specified sensor if any
+        # Add possibility for the user to indicate a specific sender address in sensor configuration using added 'sender' field.
+        # So use specified sender address if any
         if 'sender' in sensor:
             sender = [(sensor['sender'] >> i*8) & 0xff for i in reversed(range(4))]
         else:
-            sender = sender=self.enocean_sender
+            sender = self.enocean_sender
 
         try:
             # Now pass command to RadioPacket.create()
@@ -275,9 +276,10 @@ class Communicator:
             # data packet received
             # start with default data
 
-            # Commented packet initialization, it seems to be mishandled when using VLD as the length is variable
-            #default_data = sensor['default_data'] if 'default_data' in sensor else 0
-            #packet.data[1:5] = [(default_data >> i*8) & 0xff for i in reversed(range(4))]
+            # Initialize packet with default_data if specified
+            if 'default_data' in sensor:
+                default_data = sensor['default_data']
+                packet.data[1:5] = [(default_data >> i*8) & 0xff for i in reversed(range(4))]
 
             # do we have specific data to send?
             if 'data' in sensor:
