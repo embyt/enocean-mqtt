@@ -58,6 +58,24 @@ func            = 0x02
 type            = 0x05
 persistent      = 1
 
+[shutter]
+# this sensor is used for sending data
+# address is the destination address then
+address         = 0x051C1FB7
+rorg            = 0xD2
+func            = 0x05
+type            = 0x00
+
+[radiator]
+address         = 0xDEADBEEF
+rorg            = 0xD2   # VLD
+func            = 0x01
+type            = 0x0C
+log_learn       = 1
+command         = CMD
+# use a specific sender address when sending packets to this device
+sender          = 0xFFDC1711
+
 [hvac_actuator]
 address = 0xFFDC9500
 rorg            = 0xA5   # BS4
@@ -72,21 +90,3 @@ default_data    = 0x32790008
 address         = 0xFFD05085
 # received messages from this sensor will not appear as warnings in the log file
 ignore          = 1
-
-[shutter]
-# this sensor is used for sending data
-# address is the destination address then
-address         = 0x051C1FB7
-rorg            = 0xD2
-func            = 0x05
-type            = 0x00
-# when sending, this is the data default that can be customized via MQTT
-default_data    = 0x00000000
-
-[radiator]
-address         = 0xDEADBEEF
-rorg            = 0xD2   # VLD
-func            = 0x01
-type            = 0x0C
-log_learn       = 1
-command         = CMD

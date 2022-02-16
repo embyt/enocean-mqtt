@@ -90,7 +90,9 @@ To send EnOcean messages you prepare the packet data by sending MQTT request to 
 
 An example: If you want to set the valve position (set point) of a heating actuator named `heating` (e.g. with `rorg = 0xA5`, `func = 0x20`, `type = 0x01`) to 80 % you publish the integer value 80 to the topic `enocean/heating/req/SP`. This replaces the corresponding part of `default_data`.
 
-To finally trigger the sending of the packet, place an MQTT message to the device's `req/send` topic.
+For VLD packets, you need to set the VLD type. For this, configure a `command` topic in the configuration file. Sending and MQTT request to this topic sets the command ID of the used EEP profile.
+
+To finally trigger the sending of the packet, place an MQTT message to the device's `req/send` topic. If you want to clear the customized data buffer back to default, set the MQTT payload to `clear`. Any other payload will keep the data buffer for further send requests.
 
 ### Answering EnOcean Messages ###
 

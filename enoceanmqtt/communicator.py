@@ -132,8 +132,10 @@ class Communicator:
 
                     self._send_packet(cur_sensor, destination, command)
 
-                    # Clear sent data
-                    #del cur_sensor['data']
+                    # Clear sent data, if requested by the send message
+                    if msg.payload == "clear":
+                        logging.debug('Clearing data buffer.')
+                        del cur_sensor['data']
 
                 else:
                     found_topic = True
@@ -253,7 +255,7 @@ class Communicator:
         else:
             direction = None
         # is this a response to a learn packet?
-        is_learn = True if learn_data is not None else False
+        is_learn = learn_data is not None
 
         # Add possibility for the user to indicate a specific sender address in sensor configuration using added 'sender' field.
         # So use specified sender address if any
@@ -278,8 +280,7 @@ class Communicator:
 
             # Initialize packet with default_data if specified
             if 'default_data' in sensor:
-                default_data = sensor['default_data']
-                packet.data[1:5] = [(default_data >> i*8) & 0xff for i in reversed(range(4))]
+                packet.data[1:5] = [(sensor['default_data'] >> i*8) & 0xff for i in reversed(range(4))]
 
             # do we have specific data to send?
             if 'data' in sensor:
