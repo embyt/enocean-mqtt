@@ -59,7 +59,10 @@ def load_config_file(config_files):
                 new_sens = {'name': mqtt_prefix + section}
                 for key in config_parser[section]:
                     try:
-                        new_sens[key] = int(config_parser[section][key], 0)
+                        if key == 'command':
+                            new_sens[key] = config_parser[section][key]
+                        else:
+                            new_sens[key] = int(config_parser[section][key], 0)
                     except KeyError:
                         new_sens[key] = None
                 sensors.append(new_sens)

@@ -1,3 +1,4 @@
+
 # Copyright (c) 2020 embyt GmbH. See LICENSE for further details.
 # Author: Roman Morawek <roman.morawek@embyt.com>
 """this class handles the enocean and mqtt interfaces"""
@@ -34,12 +35,9 @@ class Communicator:
 
         # check for mandatory configuration
         if 'mqtt_host' not in self.conf or 'enocean_port' not in self.conf:
-            raise Exception(
-                "Mandatory configuration not found: mqtt_host/enocean_port")
-        mqtt_port = int(self.conf['mqtt_port']
-                        ) if 'mqtt_port' in self.conf else 1883
-        mqtt_keepalive = int(
-            self.conf['mqtt_keepalive']) if 'mqtt_keepalive' in self.conf else 60
+            raise Exception("Mandatory configuration not found: mqtt_host/enocean_port")
+        mqtt_port = int(self.conf['mqtt_port']) if 'mqtt_port' in self.conf else 1883
+        mqtt_keepalive = int(self.conf['mqtt_keepalive']) if 'mqtt_keepalive' in self.conf else 60
 
         # setup mqtt connection
         client_id = self.conf['mqtt_client_id'] if 'mqtt_client_id' in self.conf else ''
@@ -50,15 +48,13 @@ class Communicator:
         self.mqtt.on_publish = self._on_mqtt_publish
         if 'mqtt_user' in self.conf:
             logging.info("Authenticating: %s", self.conf['mqtt_user'])
-            self.mqtt.username_pw_set(
-                self.conf['mqtt_user'], self.conf['mqtt_pwd'])
+            self.mqtt.username_pw_set(self.conf['mqtt_user'], self.conf['mqtt_pwd'])
         if str(self.conf.get('mqtt_ssl')) in ("True", "true", "1"):
             logging.info("Enabling SSL")
             ca_certs = self.conf['mqtt_ssl_ca_certs'] if 'mqtt_ssl_ca_certs' in self.conf else None
             certfile = self.conf['mqtt_ssl_certfile'] if 'mqtt_ssl_certfile' in self.conf else None
             keyfile = self.conf['mqtt_ssl_keyfile'] if 'mqtt_ssl_keyfile' in self.conf else None
-            self.mqtt.tls_set(ca_certs=ca_certs,
-                              certfile=certfile, keyfile=keyfile)
+            self.mqtt.tls_set(ca_certs=ca_certs, certfile=certfile, keyfile=keyfile)
             if str(self.conf.get('mqtt_ssl_insecure')) in ("True", "true", "1"):
                 logging.warning("Disabling SSL certificate verification")
                 self.mqtt.tls_insecure_set(True)
@@ -66,8 +62,7 @@ class Communicator:
             self.mqtt.enable_logger()
         logging.debug("Connecting to host %s, port %s, keepalive %s",
                       self.conf['mqtt_host'], mqtt_port, mqtt_keepalive)
-        self.mqtt.connect_async(
-            self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
+        self.mqtt.connect_async(self.conf['mqtt_host'], port=mqtt_port, keepalive=mqtt_keepalive)
         self.mqtt.loop_start()
 
         # setup enocean communication
@@ -117,7 +112,29 @@ class Communicator:
                     logging.debug("Trigger message to: %s", cur_sensor['name'])
                     destination = [(cur_sensor['address'] >> i*8) &
                                    0xff for i in reversed(range(4))]
-                    self._send_packet(cur_sensor, destination)
+
+                    # Retrieve command from MQTT message and pass it to _send_packet()
+                    command=None
+                    command_shortcut=cur_sensor.get('command')
+
+                    if command_shortcut:
+                        # Check MQTT message has valid data
+                        if 'data' not in cur_sensor:
+                            logging.warning('No data to send from MQTT message!')
+                            return
+                        # Check MQTT message sets the command field
+                        if command_shortcut not in cur_sensor['data']:
+                            logging.warning('Command field %s must be set in MQTT message!', command_shortcut)
+                            return
+                        # Retrieve command id from MQTT message
+                        command = cur_sensor['data'][command_shortcut]
+                        logging.debug('Retrieved command id from MQTT message: %s', hex(command))
+
+                    self._send_packet(cur_sensor, destination, command)
+
+                    # Clear sent data
+                    #del cur_sensor['data']
+
                 else:
                     found_topic = True
                     # parse message content
@@ -125,8 +142,7 @@ class Communicator:
                     try:
                         value = int(msg.payload)
                     except ValueError:
-                        logging.warning(
-                            "Cannot parse int value for %s: %s", msg.topic, msg.payload)
+                        logging.warning("Cannot parse int value for %s: %s", msg.topic, msg.payload)
                     # store received data
                     logging.debug("%s: %s=%s", cur_sensor['name'], prop, value)
                     if 'data' not in cur_sensor:
@@ -138,6 +154,24 @@ class Communicator:
     def _on_mqtt_publish(self, _mqtt_client, _userdata, _mid):
         '''the callback for when a PUBLISH message is successfully sent to the MQTT server.'''
         #logging.debug("Published MQTT message "+str(mid))
+
+    def _get_command_id(self, packet, cur_sensor):
+        '''interpret packet to retrieve command id from VLD packets'''
+        # Retrieve the first defined EEP profile matching sensor RORG-FUNC-TYPE
+        # As we take the first defined profile, this suppose that command is
+        # ALWAYS at the same offset and ALWAYS has the same size.
+        profile = packet.eep.find_profile(packet._bit_data, cur_sensor['rorg'], cur_sensor['func'], cur_sensor['type'])
+
+        # Loop over profile contents
+        for source in profile.contents:
+            if not source.name:
+                continue
+            # Check the current shortcut matches the command shortcut
+            if source['shortcut'] == cur_sensor.get('command'):
+                return packet.eep._get_raw(source, packet._bit_data)
+
+        # If not found, return None for default handling of the packet
+        return None
 
     def _read_packet(self, packet):
         '''interpret packet, read properties and publish to MQTT'''
@@ -153,16 +187,23 @@ class Communicator:
                     if mqtt_publish_json:
                         mqtt_json['RSSI'] = packet.dBm
                     else:
-                        self.mqtt.publish(
-                            cur_sensor['name']+"/RSSI", packet.dBm)
+                        self.mqtt.publish(cur_sensor['name']+"/RSSI", packet.dBm)
                 if not packet.learn or str(cur_sensor.get('log_learn')) in ("True", "true", "1"):
                     # data packet received
                     found_property = False
                     if packet.packet_type == PACKET.RADIO and packet.rorg == cur_sensor['rorg']:
                         # radio packet of proper rorg type received; parse EEP
                         direction = cur_sensor.get('direction')
-                        properties = packet.parse_eep(
-                            cur_sensor['func'], cur_sensor['type'], direction)
+
+                        # Retrieve command from the received packet and pass it to parse_eep()
+                        command=None
+                        if cur_sensor.get('command'):
+                            command = self._get_command_id(packet, cur_sensor)
+                            logging.debug('Retrieved command id from packet: %s', hex(command))
+
+                        # Retrieve properties from EEP
+                        properties = packet.parse_eep(cur_sensor['func'], cur_sensor['type'], direction, command)
+
                         # loop through all EEP properties
                         for prop_name in properties:
                             found_property = True
@@ -177,16 +218,14 @@ class Communicator:
                             logging.debug("%s: %s (%s)=%s %s", cur_sensor['name'], prop_name,
                                           cur_prop['description'], cur_prop['value'],
                                           cur_prop['unit'])
-                            retain = str(cur_sensor.get('persistent')) in (
-                                "True", "true", "1")
+                            retain = str(cur_sensor.get('persistent')) in ("True", "true", "1")
                             if mqtt_publish_json:
                                 mqtt_json[prop_name] = value
                             else:
                                 self.mqtt.publish(cur_sensor['name'] +
                                                   "/"+prop_name, value, retain=retain)
                     if not found_property:
-                        logging.warning(
-                            "message not interpretable: %s", cur_sensor['name'])
+                        logging.warning("message not interpretable: %s", cur_sensor['name'])
                     elif mqtt_publish_json:
                         name = cur_sensor['name']
                         value = json.dumps(mqtt_json)
@@ -201,10 +240,9 @@ class Communicator:
         # prepare addresses
         destination = in_packet.sender
 
-        self._send_packet(sensor, destination, True,
-                          in_packet.data if in_packet.learn else None)
+        self._send_packet(sensor, destination, None, True, in_packet.data if in_packet.learn else None)
 
-    def _send_packet(self, sensor, destination, negate_direction=False, learn_data=None):
+    def _send_packet(self, sensor, destination, command=None, negate_direction=False, learn_data=None):
         '''triggers sending of an enocean packet'''
         # determine direction indicator
         if 'direction' in sensor:
@@ -217,9 +255,17 @@ class Communicator:
         # is this a response to a learn packet?
         is_learn = True if learn_data is not None else False
 
+        # Add possibility for the user to indicate a specific sender address in sensor configuration using added 'sender' field.
+        # So use specified sender address if any
+        if 'sender' in sensor:
+            sender = [(sensor['sender'] >> i*8) & 0xff for i in reversed(range(4))]
+        else:
+            sender = self.enocean_sender
+
         try:
+            # Now pass command to RadioPacket.create()
             packet = RadioPacket.create(sensor['rorg'], sensor['func'], sensor['type'],
-                                        direction=direction, sender=self.enocean_sender,
+                                        direction=direction, command=command, sender=sender,
                                         destination=destination, learn=is_learn)
         except ValueError as err:
             logging.error("Cannot create RF packet: %s", err)
@@ -229,9 +275,12 @@ class Communicator:
         if not is_learn:
             # data packet received
             # start with default data
-            default_data = sensor['default_data'] if 'default_data' in sensor else 0
-            packet.data[1:5] = [(default_data >> i*8) &
-                                0xff for i in reversed(range(4))]
+
+            # Initialize packet with default_data if specified
+            if 'default_data' in sensor:
+                default_data = sensor['default_data']
+                packet.data[1:5] = [(default_data >> i*8) & 0xff for i in reversed(range(4))]
+
             # do we have specific data to send?
             if 'data' in sensor:
                 # override with specific data settings
@@ -240,8 +289,7 @@ class Communicator:
                 packet.parse_eep()  # ensure that the logging output of packet is updated
             else:
                 # what to do if we have no data to send yet?
-                logging.warning(
-                    'sending only default data as answer to %s', sensor['name'])
+                logging.warning('sending only default data as answer to %s', sensor['name'])
 
         else:
             # learn request received
@@ -272,8 +320,7 @@ class Communicator:
 
         # abort loop if sensor not found
         if not found_sensor:
-            logging.info("unknown sensor: %s",
-                         enocean.utils.to_hex_string(packet.sender))
+            logging.info("unknown sensor: %s", enocean.utils.to_hex_string(packet.sender))
             return
 
         # interpret packet, read properties and publish to MQTT
