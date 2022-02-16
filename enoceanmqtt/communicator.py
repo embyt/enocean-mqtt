@@ -114,8 +114,8 @@ class Communicator:
                                    0xff for i in reversed(range(4))]
 
                     # Retrieve command from MQTT message and pass it to _send_packet()
-                    command=None
-                    command_shortcut=cur_sensor.get('command')
+                    command = None
+                    command_shortcut = cur_sensor.get('command')
 
                     if command_shortcut:
                         # Check MQTT message has valid data
@@ -124,7 +124,8 @@ class Communicator:
                             return
                         # Check MQTT message sets the command field
                         if command_shortcut not in cur_sensor['data']:
-                            logging.warning('Command field %s must be set in MQTT message!', command_shortcut)
+                            logging.warning(
+                                'Command field %s must be set in MQTT message!', command_shortcut)
                             return
                         # Retrieve command id from MQTT message
                         command = cur_sensor['data'][command_shortcut]
@@ -162,7 +163,8 @@ class Communicator:
         # Retrieve the first defined EEP profile matching sensor RORG-FUNC-TYPE
         # As we take the first defined profile, this suppose that command is
         # ALWAYS at the same offset and ALWAYS has the same size.
-        profile = packet.eep.find_profile(packet._bit_data, cur_sensor['rorg'], cur_sensor['func'], cur_sensor['type'])
+        profile = packet.eep.find_profile(
+            packet._bit_data, cur_sensor['rorg'], cur_sensor['func'], cur_sensor['type'])
 
         # Loop over profile contents
         for source in profile.contents:
@@ -198,13 +200,14 @@ class Communicator:
                         direction = cur_sensor.get('direction')
 
                         # Retrieve command from the received packet and pass it to parse_eep()
-                        command=None
+                        command = None
                         if cur_sensor.get('command'):
                             command = self._get_command_id(packet, cur_sensor)
                             logging.debug('Retrieved command id from packet: %s', hex(command))
 
                         # Retrieve properties from EEP
-                        properties = packet.parse_eep(cur_sensor['func'], cur_sensor['type'], direction, command)
+                        properties = packet.parse_eep(
+                            cur_sensor['func'], cur_sensor['type'], direction, command)
 
                         # loop through all EEP properties
                         for prop_name in properties:
@@ -242,7 +245,8 @@ class Communicator:
         # prepare addresses
         destination = in_packet.sender
 
-        self._send_packet(sensor, destination, None, True, in_packet.data if in_packet.learn else None)
+        self._send_packet(sensor, destination, None, True,
+                          in_packet.data if in_packet.learn else None)
 
     def _send_packet(self, sensor, destination, command=None, negate_direction=False, learn_data=None):
         '''triggers sending of an enocean packet'''
@@ -280,7 +284,8 @@ class Communicator:
 
             # Initialize packet with default_data if specified
             if 'default_data' in sensor:
-                packet.data[1:5] = [(sensor['default_data'] >> i*8) & 0xff for i in reversed(range(4))]
+                packet.data[1:5] = [(sensor['default_data'] >> i*8) &
+                                    0xff for i in reversed(range(4))]
 
             # do we have specific data to send?
             if 'data' in sensor:
