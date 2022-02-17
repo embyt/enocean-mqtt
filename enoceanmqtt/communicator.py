@@ -134,7 +134,8 @@ class Communicator:
                     self._send_packet(cur_sensor, destination, command)
 
                     # Clear sent data, if requested by the send message
-                    if msg.payload == "clear":
+                    # MQTT payload is binary data, thus we need to decode it
+                    if msg.payload.decode('UTF-8') == "clear":
                         logging.debug('Clearing data buffer.')
                         del cur_sensor['data']
 
