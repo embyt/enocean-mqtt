@@ -85,7 +85,7 @@ def setup_logging(log_filename='', log_level=logging.INFO):
     logging.getLogger().setLevel(log_level)
 
     # create console and log file handlers and the formatter to the handlers
-    log_console = logging.StreamHandler()
+    log_console = logging.StreamHandler(sys.stdout)
     log_console.setFormatter(log_formatter)
     log_console.setLevel(log_level)
     logging.getLogger().addHandler(log_console)
