@@ -1,4 +1,3 @@
-
 # Copyright (c) 2020 embyt GmbH. See LICENSE for further details.
 # Author: Roman Morawek <roman.morawek@embyt.com>
 """this class handles the enocean and mqtt interfaces"""
@@ -194,42 +193,11 @@ class Communicator:
                     else:
                         self.mqtt.publish(cur_sensor['name']+"/RSSI", packet.dBm)
                 if not packet.learn or str(cur_sensor.get('log_learn')) in ("True", "true", "1"):
-                    # data packet received
-                    found_property = False
-                    if packet.packet_type == PACKET.RADIO and packet.rorg == cur_sensor['rorg']:
-                        # radio packet of proper rorg type received; parse EEP
-                        direction = cur_sensor.get('direction')
-
-                        # Retrieve command from the received packet and pass it to parse_eep()
-                        command = None
-                        if cur_sensor.get('command'):
-                            command = self._get_command_id(packet, cur_sensor)
-                            logging.debug('Retrieved command id from packet: %s', hex(command))
-
-                        # Retrieve properties from EEP
-                        properties = packet.parse_eep(
-                            cur_sensor['func'], cur_sensor['type'], direction, command)
-
-                        # loop through all EEP properties
-                        for prop_name in properties:
-                            found_property = True
-                            cur_prop = packet.parsed[prop_name]
-                            # we only extract numeric values, either the scaled ones
-                            # or the raw values for enums
-                            if isinstance(cur_prop['value'], numbers.Number):
-                                value = cur_prop['value']
-                            else:
-                                value = cur_prop['raw_value']
-                            # publish extracted information
-                            logging.debug("%s: %s (%s)=%s %s", cur_sensor['name'], prop_name,
-                                          cur_prop['description'], cur_prop['value'],
-                                          cur_prop['unit'])
-                            retain = str(cur_sensor.get('persistent')) in ("True", "true", "1")
-                            if mqtt_publish_json:
-                                mqtt_json[prop_name] = value
-                            else:
-                                self.mqtt.publish(cur_sensor['name'] +
-                                                  "/"+prop_name, value, retain=retain)
+                    retain = str(cur_sensor.get('persistent')) in ("True", "true", "1")
+                    found_property = self._handle_data_packet(
+                        packet, cur_sensor,
+                        mqtt_json if mqtt_publish_json else None, retain
+                    )
                     if not found_property:
                         logging.warning("message not interpretable: %s", cur_sensor['name'])
                     elif mqtt_publish_json:
@@ -241,6 +209,43 @@ class Communicator:
                     # learn request received
                     logging.info("learn request not emitted to mqtt")
 
+    def _handle_data_packet(self, packet, sensor, mqtt_json, retain: bool):
+        # data packet received
+        found_property = False
+        if packet.packet_type == PACKET.RADIO and packet.rorg == sensor['rorg']:
+            # radio packet of proper rorg type received; parse EEP
+            direction = sensor.get('direction')
+
+            # Retrieve command from the received packet and pass it to parse_eep()
+            command = None
+            if sensor.get('command'):
+                command = self._get_command_id(packet, sensor)
+                logging.debug('Retrieved command id from packet: %s', hex(command))
+
+            # Retrieve properties from EEP
+            properties = packet.parse_eep(
+                sensor['func'], sensor['type'], direction, command)
+
+            # loop through all EEP properties
+            for prop_name in properties:
+                found_property = True
+                cur_prop = packet.parsed[prop_name]
+                # we only extract numeric values, either the scaled ones
+                # or the raw values for enums
+                if isinstance(cur_prop['value'], numbers.Number):
+                    value = cur_prop['value']
+                else:
+                    value = cur_prop['raw_value']
+                # publish extracted information
+                logging.debug("%s: %s (%s)=%s %s", sensor['name'], prop_name,
+                              cur_prop['description'], cur_prop['value'], cur_prop['unit'])
+                retain = str(sensor.get('persistent')) in ("True", "true", "1")
+                if mqtt_json is not None:
+                    mqtt_json[prop_name] = value
+                else:
+                    self.mqtt.publish(f"{sensor['name']}/{prop_name}", value, retain=retain)
+        return found_property
+
     def _reply_packet(self, in_packet, sensor):
         '''send enocean message as a reply to an incoming message'''
         # prepare addresses
@@ -249,7 +254,8 @@ class Communicator:
         self._send_packet(sensor, destination, None, True,
                           in_packet.data if in_packet.learn else None)
 
-    def _send_packet(self, sensor, destination, command=None, negate_direction=False, learn_data=None):
+    def _send_packet(self, sensor, destination, command=None,
+                     negate_direction=False, learn_data=None):
         '''triggers sending of an enocean packet'''
         # determine direction indicator
         if 'direction' in sensor:
@@ -262,7 +268,8 @@ class Communicator:
         # is this a response to a learn packet?
         is_learn = learn_data is not None
 
-        # Add possibility for the user to indicate a specific sender address in sensor configuration using added 'sender' field.
+        # Add possibility for the user to indicate a specific sender address
+        # in sensor configuration using added 'sender' field.
         # So use specified sender address if any
         if 'sender' in sensor:
             sender = [(sensor['sender'] >> i*8) & 0xff for i in reversed(range(4))]

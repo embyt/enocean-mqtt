@@ -76,27 +76,25 @@ def load_config_file(config_files):
     return sensors, global_config
 
 
-def setup_logging(log_filename='', log_file_level=logging.INFO, debug=False):
+def setup_logging(log_filename='', log_level=logging.INFO):
     """initialize python logging infrastructure"""
     # create formatter
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
 
     # set root logger to lowest log level
-    logging.getLogger().setLevel(logging.DEBUG if debug else log_file_level)
+    logging.getLogger().setLevel(log_level)
 
     # create console and log file handlers and the formatter to the handlers
     log_console = logging.StreamHandler()
     log_console.setFormatter(log_formatter)
-    log_console.setLevel(logging.DEBUG if debug else logging.WARNING)
+    log_console.setLevel(log_level)
     logging.getLogger().addHandler(log_console)
     if log_filename:
         log_file = logging.FileHandler(log_filename)
-        log_file.setLevel(log_file_level)
+        log_file.setLevel(log_level)
         log_file.setFormatter(log_formatter)
         logging.getLogger().addHandler(log_file)
         logging.info("Logging to file: %s", log_filename)
-    if debug:
-        logging.info("Logging debug to console")
 
 
 def main():
@@ -106,7 +104,7 @@ def main():
     conf.update(parse_args())
 
     # setup logger
-    setup_logging(conf['logfile'], debug=conf['debug'])
+    setup_logging(conf['logfile'], logging.DEBUG if conf['debug'] else logging.INFO)
 
     # load config file
     sensors, global_config = load_config_file(conf['config'])
