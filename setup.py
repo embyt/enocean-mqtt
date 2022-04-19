@@ -15,7 +15,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='enocean-mqtt',
-    version='0.1.2',
+    version='0.1.3',
     author='Roman Morawek',
     author_email='roman.morawek@embyt.com',
     description='Receives messages from an enOcean serial interface (USB) and provides selected messages to an MQTT broker.',
