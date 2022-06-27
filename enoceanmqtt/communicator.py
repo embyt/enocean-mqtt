@@ -226,8 +226,22 @@ class Communicator:
             properties = packet.parse_eep(
                 sensor['func'], sensor['type'], direction, command)
 
+            # Retrieve channel value from EEP
+            channel_id = None
+            channel_value = None
+            if sensor.get('channel'):
+                channel_id = sensor.get('channel')
+                cur_prop = packet.parsed[channel_id]
+                if cur_prop:
+                    if isinstance(cur_prop['value'], numbers.Number):
+                        channel_value = cur_prop['value']
+                    else:
+                        channel_value = cur_prop['raw_value']
+
             # loop through all EEP properties
             for prop_name in properties:
+                if prop_name == channel_id:
+                    continue
                 found_property = True
                 cur_prop = packet.parsed[prop_name]
                 # we only extract numeric values, either the scaled ones
@@ -243,7 +257,10 @@ class Communicator:
                 if mqtt_json is not None:
                     mqtt_json[prop_name] = value
                 else:
-                    self.mqtt.publish(f"{sensor['name']}/{prop_name}", value, retain=retain)
+                    if channel_value is not None:
+                        self.mqtt.publish(f"{sensor['name']}/{channel_id}{channel_value}/{prop_name}", value, retain=retain)
+                    else:
+                        self.mqtt.publish(f"{sensor['name']}/{prop_name}", value, retain=retain)
         return found_property
 
     def _reply_packet(self, in_packet, sensor):
