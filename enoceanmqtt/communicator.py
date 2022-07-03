@@ -240,9 +240,9 @@ class Communicator:
 
             # loop through all EEP properties
             for prop_name in properties:
+                found_property = True
                 if prop_name == channel_id:
                     continue
-                found_property = True
                 cur_prop = packet.parsed[prop_name]
                 # we only extract numeric values, either the scaled ones
                 # or the raw values for enums
