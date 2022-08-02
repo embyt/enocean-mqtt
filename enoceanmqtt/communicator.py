@@ -118,7 +118,7 @@ class Communicator:
             found_topic = self._mqtt_message_normal(msg)
 
         if not found_topic:
-            logging.warning("Unexpected MQTT message: %s", msg.topic)
+            logging.warning("Unexpected or erroneous MQTT message: %s: %s", msg.topic, msg.payload)
 
     def _on_mqtt_publish(self, _mqtt_client, _userdata, _mid):
         '''the callback for when a PUBLISH message is successfully sent to the MQTT server.'''
@@ -155,6 +155,8 @@ class Communicator:
                         value = int(msg.payload)
                     except ValueError:
                         logging.warning("Cannot parse int value for %s: %s", msg.topic, msg.payload)
+                        # Prevent storing undefined value, as it will trigger exception in EnOcean library
+                        return
                     # store received data
                     logging.debug("%s: %s=%s", cur_sensor['name'], prop, value)
                     if 'data' not in cur_sensor:
@@ -194,6 +196,8 @@ class Communicator:
                             mqtt_json_payload[topic] = int(mqtt_json_payload[topic])
                         except ValueError:
                             logging.warning("Cannot parse int value for %s: %s", topic, mqtt_json_payload[topic])
+                            # Prevent storing undefined value, as it will trigger exception in EnOcean library
+                            del mqtt_json_payload[topic]
 
                     # Append received data to cur_sensor['data'].
                     # This will keep the possibility to pass single topic/payload as done with
@@ -207,6 +211,9 @@ class Communicator:
                     # Finally, send the message
                     if send == True:
                         self._send_message(cur_sensor, clear)
+
+                # The targeted sensor has been found and the MQTT message has been handled
+                break
 
         return found_topic
 
@@ -226,7 +233,7 @@ class Communicator:
                 logging.warning('No data to send from MQTT message!')
                 return
             # Check MQTT message sets the command field
-            if command_shortcut not in sensor['data']:
+            if command_shortcut not in sensor['data'] or sensor['data'][command_shortcut] is None:
                 logging.warning(
                     'Command field %s must be set in MQTT message!', command_shortcut)
                 return
@@ -264,6 +271,41 @@ class Communicator:
         # If not found, return None for default handling of the packet
         return None
 
+    def _publish_mqtt(self, sensor, channel_id, channel_value, mqtt_json):
+        '''Publish decoded packet content to MQTT'''
+        # Publish using JSON format ?
+        mqtt_publish_json = str(sensor.get('publish_json')) in ("True", "true", "1")
+
+        # Retain the to-be-published message ?
+        retain = str(sensor.get('persistent')) in ("True", "true", "1")
+
+        # Handling device RSSI
+        if str(sensor.get('publish_rssi')) in ("True", "true", "1"):
+            if mqtt_publish_json:
+                # Keep RSSI out of groups
+                if channel_value is not None:
+                    self.mqtt.publish(sensor['name'], json.dumps({"RSSI": mqtt_json['RSSI']}), retain=retain)
+                    del mqtt_json['RSSI']
+            else:
+                self.mqtt.publish(sensor['name']+"/RSSI", mqtt_json['RSSI'], retain=retain)
+                del mqtt_json['RSSI']
+
+        # Handling packet data
+        if channel_value is not None:
+            topic = sensor['name']+f"/{channel_id}{channel_value}"
+        else:
+            topic = sensor['name']
+
+        # Publish packet data to MQTT
+        value = json.dumps(mqtt_json)
+        logging.debug("%s: Sent MQTT: %s", topic, value)
+
+        if mqtt_publish_json:
+            self.mqtt.publish(topic, value, retain=retain)
+        else:
+            for prop_name, value in mqtt_json.items():
+                self.mqtt.publish(f"{topic}/{prop_name}", value, retain=retain)
+
     def _read_packet(self, packet):
         '''interpret packet, read properties and publish to MQTT'''
         mqtt_json = {}
@@ -271,38 +313,30 @@ class Communicator:
         for cur_sensor in self.sensors:
             # does this sensor match?
             if enocean.utils.combine_hex(packet.sender) == cur_sensor['address']:
-                mqtt_publish_json = 'publish_json' in cur_sensor and \
-                    cur_sensor['publish_json'] in ("True", "true", "1")
                 # found sensor configured in config file
-                if str(cur_sensor.get('publish_rssi')) in ("True", "true", "1"):
-                    if mqtt_publish_json:
-                        mqtt_json['RSSI'] = packet.dBm
-                    else:
-                        self.mqtt.publish(cur_sensor['name']+"/RSSI", packet.dBm)
+                # Shall the packet be published to MQTT ?
                 if not packet.learn or str(cur_sensor.get('log_learn')) in ("True", "true", "1"):
-                    retain = str(cur_sensor.get('persistent')) in ("True", "true", "1")
+                    # Store RSSI
+                    mqtt_json['RSSI'] = packet.dBm
+
+                    # Handling received data packet
                     [found_property, channel_id, channel_value] = self._handle_data_packet(
-                        packet, cur_sensor,
-                        mqtt_json if mqtt_publish_json else None, retain
-                    )
+                        packet, cur_sensor, mqtt_json)
                     if not found_property:
                         logging.warning("message not interpretable: %s", cur_sensor['name'])
-                    elif mqtt_publish_json:
-                        if channel_value is not None:
-                            name = cur_sensor['name']+f"/{channel_id}{channel_value}"
-                        else:
-                            name = cur_sensor['name']
-                        value = json.dumps(mqtt_json)
-                        logging.debug("%s: Sent MQTT: %s", name, value)
-                        self.mqtt.publish(name, value, retain=retain)
+                    else:
+                        self._publish_mqtt(cur_sensor, channel_id, channel_value, mqtt_json)
                 else:
                     # learn request received
                     logging.info("learn request not emitted to mqtt")
 
-    def _handle_data_packet(self, packet, sensor, mqtt_json, retain: bool):
+                # The packet has been handled
+                break
+
+    def _handle_data_packet(self, packet, sensor, mqtt_json):
         # data packet received
         found_property = False
-        channel_id = None
+        channel_id = sensor.get('channel')
         channel_value = None
         if packet.packet_type == PACKET.RADIO and packet.rorg == sensor['rorg']:
             # radio packet of proper rorg type received; parse EEP
@@ -315,24 +349,11 @@ class Communicator:
                 logging.debug('Retrieved command id from packet: %s', hex(command))
 
             # Retrieve properties from EEP
-            properties = packet.parse_eep(
-                sensor['func'], sensor['type'], direction, command)
-
-            # Retrieve channel value from EEP
-            if sensor.get('channel'):
-                channel_id = sensor.get('channel')
-                cur_prop = packet.parsed[channel_id]
-                if cur_prop:
-                    if isinstance(cur_prop['value'], numbers.Number):
-                        channel_value = cur_prop['value']
-                    else:
-                        channel_value = cur_prop['raw_value']
+            properties = packet.parse_eep(sensor['func'], sensor['type'], direction, command)
 
             # loop through all EEP properties
             for prop_name in properties:
                 found_property = True
-                if prop_name == channel_id:
-                    continue
                 cur_prop = packet.parsed[prop_name]
                 # we only extract numeric values, either the scaled ones
                 # or the raw values for enums
@@ -343,14 +364,13 @@ class Communicator:
                 # publish extracted information
                 logging.debug("%s: %s (%s)=%s %s", sensor['name'], prop_name,
                               cur_prop['description'], cur_prop['value'], cur_prop['unit'])
-                retain = str(sensor.get('persistent')) in ("True", "true", "1")
-                if mqtt_json is not None:
-                    mqtt_json[prop_name] = value
+
+                # Retrieve channel value from EEP
+                if prop_name == channel_id:
+                    channel_value = value
                 else:
-                    if channel_value is not None:
-                        self.mqtt.publish(f"{sensor['name']}/{channel_id}{channel_value}/{prop_name}", value, retain=retain)
-                    else:
-                        self.mqtt.publish(f"{sensor['name']}/{prop_name}", value, retain=retain)
+                    mqtt_json[prop_name] = value
+
         return [found_property, channel_id, channel_value]
 
 
