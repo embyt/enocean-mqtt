@@ -294,10 +294,10 @@ class Communicator:
 
         # Determine MQTT topic
         topic = sensor['name']
-        for _id in channel_id:
-            if mqtt_json.get(_id) not in (None, ''):
-                topic += f"/{_id}{mqtt_json[_id]}"
-                del mqtt_json[_id]
+        for cur_id in channel_id:
+            if mqtt_json.get(cur_id) not in (None, ''):
+                topic += f"/{cur_id}{mqtt_json[cur_id]}"
+                del mqtt_json[cur_id]
 
         # Publish packet data to MQTT
         value = json.dumps(mqtt_json)
