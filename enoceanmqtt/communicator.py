@@ -266,7 +266,7 @@ class Communicator:
                # Check the current shortcut matches the command shortcut
                if source['shortcut'] == sensor.get('command'):
                    return packet.eep._get_raw(source, packet._bit_data)
-        
+
         # If profile or command shortcut not found,
         # return None for default handling of the packet
         return None
@@ -283,16 +283,34 @@ class Communicator:
         channel_id = sensor.get('channel')
         channel_id = channel_id.split('/') if channel_id not in (None, '') else []
 
-        # Handling device RSSI
+        # Handling Auxiliary data RSSI
+        aux_data = {}
         if str(sensor.get('publish_rssi')) in ("True", "true", "1"):
             if mqtt_publish_json:
                 # Keep RSSI out of groups
                 if channel_id:
-                    self.mqtt.publish(sensor['name'], json.dumps({"RSSI": mqtt_json['RSSI']}), retain=retain)
+                    aux_data.update({"RSSI": mqtt_json['RSSI']})
                     del mqtt_json['RSSI']
             else:
                 self.mqtt.publish(sensor['name']+"/RSSI", mqtt_json['RSSI'], retain=retain)
                 del mqtt_json['RSSI']
+        else:
+            del mqtt_json['RSSI']
+
+        # Handling Auxiliary data _DATE_
+        if str(sensor.get('publish_date')) in ("True", "true", "1"):
+            if mqtt_publish_json:
+                # Keep _DATE_ out of groups
+                if channel_id:
+                    aux_data.update({"_DATE_": mqtt_json['_DATE_']})
+            else:
+                self.mqtt.publish(sensor['name']+"/_DATE_", mqtt_json['_DATE_'], retain=retain)
+        else:
+            del mqtt_json['_DATE_']
+
+        # Publish auxiliary data
+        if aux_data:
+            self.mqtt.publish(sensor['name'], json.dumps(aux_data), retain=retain)
 
         # Determine MQTT topic
         topic = sensor['name']
@@ -324,6 +342,12 @@ class Communicator:
                 if not packet.learn or str(cur_sensor.get('log_learn')) in ("True", "true", "1"):
                     # Store RSSI
                     mqtt_json['RSSI'] = packet.dBm
+
+                    # Store receive date _DATE_
+                    # Add underscore so that it is unique and
+                    # doesn't match a potential EnOcean EEP field.
+                    # If OK, may be the same could be done for RSSI ?
+                    mqtt_json['_DATE_'] = packet.received.isoformat()
 
                     # Handling received data packet
                     found_property = self._handle_data_packet( packet, cur_sensor, mqtt_json)

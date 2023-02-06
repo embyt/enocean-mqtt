@@ -90,10 +90,45 @@ To send EnOcean messages you prepare the packet data by sending MQTT request to 
 
 An example: If you want to set the valve position (set point) of a heating actuator named `heating` (e.g. with `rorg = 0xA5`, `func = 0x20`, `type = 0x01`) to 80 % you publish the integer value 80 to the topic `enocean/heating/req/SP`. This replaces the corresponding part of `default_data`.
 
+<!--
 For VLD packets, you need to set the VLD type. For this, configure a `command` topic in the configuration file. Sending and MQTT request to this topic sets the command ID of the used EEP profile.
+-->
 
 To finally trigger the sending of the packet, place an MQTT message to the device's `req/send` topic. If you want to clear the customized data buffer back to default, set the MQTT payload to `clear`. Any other payload will keep the data buffer for further send requests.
 
 ### Answering EnOcean Messages ###
 
 Similar to sending EnOceam Messages you can configure it to send a packet as an answer to in incoming EnOcean packet. For this, you configure the `answer` switch in the device's configuration section. As above, you set the `default_data` in the config file and customize the response data by publishing MQTT messages to the device topic where you prefix the topic with `/req`.
+
+### List of device options
+
+#### persistent
+Publish the received EnOcean packet with the retain flag.
+> persistent = 1
+#### publish_json
+Publish the received EnOcean packet as a JSON-formatted message.
+> publish_json = True # or true or 1
+#### publish_rssi
+Publish the received RSSI.
+> publish_rssi = 1
+#### publish_date
+Publish the EnOcean packet received date.
+> publish_date = 1
+#### command
+For EEP supporting multiple commands, define the shortcut of the packet field used as command identifier.
+> command = CMD
+#### channel
+Group received EnOcean packet fields depending on the value of one of the fields.
+> channel = IO/CMD # Received data will be published to <device_root>/IOx/CMDy
+#### log_learn
+Forward learn messages to MQTT.
+> log_learn = 1
+#### answer
+Send data as an answer to an incoming packet.
+> answer = 1
+#### direction
+Set the direction of the received packet for device needing an answer.
+> direction = 1
+#### default_data
+Default data to be sent to the device.
+> default_data = 0x80810408
