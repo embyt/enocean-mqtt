@@ -132,3 +132,8 @@ Set the direction of the received packet for device needing an answer.
 #### default_data
 Default data to be sent to the device.
 > default_data = 0x80810408
+#### sender
+Use another sender ID to send command to the device.  
+This ID should be in the range \[Base_ID...Base_ID+127\].  
+For example, if your Base_ID is 0xFFDA5580, then you can set sender to any ID between 0xFFDA5580 and 0xFFDA55FF.
+> sender = 0xFFDA5581
