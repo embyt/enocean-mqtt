@@ -148,20 +148,28 @@ class Communicator:
                     self._send_message(cur_sensor, clear)
 
                 else:
-                    found_topic = True
                     # parse message content
                     value = None
                     try:
                         value = int(msg.payload)
                     except ValueError:
-                        logging.warning("Cannot parse int value for %s: %s", msg.topic, msg.payload)
-                        # Prevent storing undefined value, as it will trigger exception in EnOcean library
-                        return
+                        try:
+                            value = float(msg.payload)
+                        except ValueError:
+                            logging.warning("Cannot parse int nor float value for %s: %s",
+                                            msg.topic, msg.payload)
+                            # Prevent storing undefined value, as it will
+                            # trigger exception in EnOcean library
+                            break
                     # store received data
                     logging.debug("%s: %s=%s", cur_sensor['name'], prop, value)
+                    found_topic = True
                     if 'data' not in cur_sensor:
                         cur_sensor['data'] = {}
                     cur_sensor['data'][prop] = value
+
+                # The targeted sensor has been found and the MQTT message has been handled
+                break
 
         return found_topic
 
@@ -189,13 +197,25 @@ class Communicator:
                         del mqtt_json_payload['send']
 
                     # Parse message content
-                    for topic in mqtt_json_payload:
-                        try:
-                            mqtt_json_payload[topic] = int(mqtt_json_payload[topic])
-                        except ValueError:
-                            logging.warning("Cannot parse int value for %s: %s", topic, mqtt_json_payload[topic])
-                            # Prevent storing undefined value, as it will trigger exception in EnOcean library
+                    for topic in tuple(mqtt_json_payload.keys()):
+                        if not isinstance(mqtt_json_payload[topic], (int,float,str)):
+                            logging.warning("Cannot parse int nor float value for %s: %s",
+                                            topic, mqtt_json_payload[topic])
+                            # Prevent storing undefined value, as it will
+                            # trigger exception in EnOcean library
                             del mqtt_json_payload[topic]
+                        elif isinstance(mqtt_json_payload[topic], str):
+                            try:
+                                mqtt_json_payload[topic] = int(mqtt_json_payload[topic])
+                            except ValueError:
+                                try:
+                                    mqtt_json_payload[topic] = float(mqtt_json_payload[topic])
+                                except ValueError:
+                                    logging.warning("Cannot parse int nor float value for %s: %s",
+                                    topic, mqtt_json_payload[topic])
+                                    # Prevent storing undefined value, as it will
+                                    # trigger exception in EnOcean library
+                                    del mqtt_json_payload[topic]
 
                     # Append received data to cur_sensor['data'].
                     # This will keep the possibility to pass single topic/payload as done with
@@ -207,7 +227,7 @@ class Communicator:
                     cur_sensor['data'].update(mqtt_json_payload)
 
                     # Finally, send the message
-                    if send == True:
+                    if send:
                         self._send_message(cur_sensor, clear)
 
                 # The targeted sensor has been found and the MQTT message has been handled
@@ -242,7 +262,7 @@ class Communicator:
         self._send_packet(sensor, destination, command)
 
         # Clear sent data, if requested by the sent message
-        if clear == True:
+        if clear:
             logging.debug('Clearing data buffer.')
             del sensor['data']
 
@@ -261,11 +281,11 @@ class Communicator:
         if profile:
             # Loop over profile contents
             for source in profile.contents:
-               if not source.name:
-                   continue
-               # Check the current shortcut matches the command shortcut
-               if source['shortcut'] == sensor.get('command'):
-                   return packet.eep._get_raw(source, packet._bit_data)
+                if not source.name:
+                    continue
+                # Check the current shortcut matches the command shortcut
+                if source['shortcut'] == sensor.get('command'):
+                    return packet.eep._get_raw(source, packet._bit_data)
 
         # If profile or command shortcut not found,
         # return None for default handling of the packet
