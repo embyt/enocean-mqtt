@@ -7,7 +7,7 @@ import setuptools
 # needed packages
 REQUIRES = [
     'enocean',
-    'paho-mqtt',
+    'paho-mqtt>=2',
 ]
 
 with open("README.md", "r") as fh:

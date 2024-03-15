@@ -19,15 +19,6 @@ class Communicator:
     mqtt = None
     enocean = None
 
-    CONNECTION_RETURN_CODE = [
-        "connection successful",
-        "incorrect protocol version",
-        "invalid client identifier",
-        "server unavailable",
-        "bad username or password",
-        "not authorised",
-    ]
-
     def __init__(self, config, sensors):
         self.conf = config
         self.sensors = sensors
@@ -40,7 +31,7 @@ class Communicator:
 
         # setup mqtt connection
         client_id = self.conf['mqtt_client_id'] if 'mqtt_client_id' in self.conf else ''
-        self.mqtt = mqtt.Client(client_id=client_id)
+        self.mqtt = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
         self.mqtt.on_connect = self._on_connect
         self.mqtt.on_disconnect = self._on_disconnect
         self.mqtt.on_message = self._on_mqtt_message
@@ -78,27 +69,23 @@ class Communicator:
     #=============================================================================================
     # MQTT CLIENT
     #=============================================================================================
-    def _on_connect(self, mqtt_client, _userdata, _flags, return_code):
+    def _on_connect(self, mqtt_client, _userdata, _flags, reason_code, properties):
         '''callback for when the client receives a CONNACK response from the MQTT server.'''
-        if return_code == 0:
+        if reason_code == 0:
             logging.info("Succesfully connected to MQTT broker.")
             # listen to enocean send requests
             for cur_sensor in self.sensors:
                 # logging.debug("MQTT subscribing: %s", cur_sensor['name']+'/req/#')
                 mqtt_client.subscribe(cur_sensor['name']+'/req/#')
         else:
-            logging.error("Error connecting to MQTT broker: %s",
-                          self.CONNECTION_RETURN_CODE[return_code]
-                          if return_code < len(self.CONNECTION_RETURN_CODE) else return_code)
+            logging.error("Error connecting to MQTT broker: %s", reason_code)
 
-    def _on_disconnect(self, _mqtt_client, _userdata, return_code):
+    def _on_disconnect(self, _mqtt_client, _userdata, reason_code, properties):
         '''callback for when the client disconnects from the MQTT server.'''
-        if return_code == 0:
+        if reason_code == 0:
             logging.warning("Successfully disconnected from MQTT broker")
         else:
-            logging.warning("Unexpectedly disconnected from MQTT broker: %s",
-                            self.CONNECTION_RETURN_CODE[return_code]
-                            if return_code < len(self.CONNECTION_RETURN_CODE) else return_code)
+            logging.warning("Unexpectedly disconnected from MQTT broker: %s", reason_code)
 
     def _on_mqtt_message(self, _mqtt_client, _userdata, msg):
         '''the callback for when a PUBLISH message is received from the MQTT server.'''
@@ -120,7 +107,7 @@ class Communicator:
         if not found_topic:
             logging.warning("Unexpected or erroneous MQTT message: %s: %s", msg.topic, msg.payload)
 
-    def _on_mqtt_publish(self, _mqtt_client, _userdata, _mid):
+    def _on_mqtt_publish(self, _mqtt_client, _userdata, _mid, _reason_codes, _properties):
         '''the callback for when a PUBLISH message is successfully sent to the MQTT server.'''
         #logging.debug("Published MQTT message "+str(mid))
 
