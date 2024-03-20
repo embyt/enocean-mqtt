@@ -80,7 +80,7 @@ class Communicator:
         else:
             logging.error("Error connecting to MQTT broker: %s", reason_code)
 
-    def _on_disconnect(self, _mqtt_client, _userdata, reason_code, properties):
+    def _on_disconnect(self, _mqtt_client, _userdata, _flags, reason_code, properties):
         '''callback for when the client disconnects from the MQTT server.'''
         if reason_code == 0:
             logging.warning("Successfully disconnected from MQTT broker")
