@@ -25,7 +25,7 @@ class Communicator:
 
         # check for mandatory configuration
         if 'mqtt_host' not in self.conf or 'enocean_port' not in self.conf:
-            raise Exception("Mandatory configuration not found: mqtt_host/enocean_port")
+            raise KeyError("Mandatory configuration not found: mqtt_host/enocean_port")
         mqtt_port = int(self.conf['mqtt_port']) if 'mqtt_port' in self.conf else 1883
         mqtt_keepalive = int(self.conf['mqtt_keepalive']) if 'mqtt_keepalive' in self.conf else 60
 
@@ -69,7 +69,7 @@ class Communicator:
     #=============================================================================================
     # MQTT CLIENT
     #=============================================================================================
-    def _on_connect(self, mqtt_client, _userdata, _flags, reason_code, properties):
+    def _on_connect(self, mqtt_client, _userdata, _flags, reason_code, _properties):
         '''callback for when the client receives a CONNACK response from the MQTT server.'''
         if reason_code == 0:
             logging.info("Succesfully connected to MQTT broker.")
@@ -80,7 +80,7 @@ class Communicator:
         else:
             logging.error("Error connecting to MQTT broker: %s", reason_code)
 
-    def _on_disconnect(self, _mqtt_client, _userdata, _flags, reason_code, properties):
+    def _on_disconnect(self, _mqtt_client, _userdata, _flags, reason_code, _properties):
         '''callback for when the client disconnects from the MQTT server.'''
         if reason_code == 0:
             logging.warning("Successfully disconnected from MQTT broker")
